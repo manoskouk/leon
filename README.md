@@ -3,7 +3,7 @@
 Getting Started
 ===============
 
-This section gives a very quick overview of how to build and use Leon, refer to
+This section gives a very quick overview of how to build and use Leon, refer to 
 the following sections if you wish (or need) more detailed information.
 
 To build it, you will need, for example, the following:

@@ -32,6 +32,8 @@ object Main {
       LeonFlagOptionDef ("xlang",       "--xlang",              "Support for extra program constructs (imperative,...)"),
       LeonFlagOptionDef ("library",     "--library",            "Inject Leon standard library"),
       LeonValueOptionDef("debug",       "--debug=<sections..>", "Enables specific messages"),
+      LeonFlagOptionDef("memo" ,        "--memo",
+        "Memoisation transformation"),
       LeonFlagOptionDef ("help",        "--help",               "Show help")
     )
 
@@ -141,6 +143,8 @@ object Main {
         settings = settings.copy(injectLibrary = value)
       case LeonFlagOption("xlang", value) =>
         settings = settings.copy(xlang = value)
+      case LeonFlagOption("memo", value) =>
+        settings = settings.copy(memo = value)
       case LeonValueOption("debug", ListValue(sections)) =>
         val debugSections = sections.flatMap { s =>
           if (s == "all") {
@@ -201,6 +205,8 @@ object Main {
         termination.TerminationPhase
       } else if (settings.xlang) {
         xlang.XlangAnalysisPhase
+      } else if (settings.memo) {
+        memoisation.MemoisationPhase
       } else if (settings.verify) {
         verification.AnalysisPhase
       } else {

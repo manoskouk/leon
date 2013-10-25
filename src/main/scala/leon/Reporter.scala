@@ -108,6 +108,6 @@ object DebugSections {
     DebugSectionOptions,
     DebugSectionTermination,
     DebugSectionVerification,
-    DebugSectionMemoisation
+    DebugSectionMemoization
   )
 }

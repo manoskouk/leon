@@ -33,7 +33,7 @@ object Main {
       LeonFlagOptionDef ("library",     "--library",            "Inject Leon standard library"),
       LeonValueOptionDef("debug",       "--debug=<sections..>", "Enables specific messages"),
       LeonFlagOptionDef("memo" ,        "--memo",
-        "Memoisation transformation"),
+        "Memoization transformation"),
       LeonFlagOptionDef ("help",        "--help",               "Show help")
     )
 
@@ -206,7 +206,7 @@ object Main {
       } else if (settings.xlang) {
         xlang.XlangAnalysisPhase
       } else if (settings.memo) {
-        memoisation.MemoisationPhase
+        Memoization.MemoizationPhase
       } else if (settings.verify) {
         verification.AnalysisPhase
       } else {

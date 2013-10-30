@@ -278,6 +278,37 @@ object TreeOps {
     postMap(substs.lift)(expr)
   }
 
+  def varDeclsOf(expr:Expr) : Set[Identifier] = {
+    def convert(t:Expr) : Set[Identifier] = {
+      Set.empty
+    }
+    def combine(s1 : Set[Identifier], s2 : Set[Identifier]) = s1 ++ s2
+    def compute(t:Expr, s : Set[Identifier]) = t match {
+      case Let(binder,value,body) => s + binder
+      case LetTuple(binders, value, body) => s ++ binders
+      // TODO case LetDef(fd, body) = fd.args map id ++ 
+      case _ => s
+      //FIXME case LetDef(funDef, body) = 
+    }
+    treeCatamorphism(convert, combine, compute, expr)
+
+  }
+
+  def variablesOf(expr: Expr) : Set[Identifier] = {
+    def convert(t: Expr) : Set[Identifier] = t match {
+      case Variable(i) => Set(i)
+      case _ => Set.empty
+    }
+    def combine(s1: Set[Identifier], s2: Set[Identifier]) = s1 ++ s2
+    def compute(t: Expr, s: Set[Identifier]) = t match {
+      case Let(i,_,_) => s -- Set(i)
+      case Choose(is,_) => s -- is
+      case MatchExpr(_, cses) => s -- (cses.map(_.pattern.binders).foldLeft(Set[Identifier]())((a, b) => a ++ b))
+      case _ => s
+    }
+    treeCatamorphism(convert, combine, compute, expr)
+  }
+
   def replaceFromIDs(substs: Map[Identifier, Expr], expr: Expr) : Expr = {
     postMap( {
         case Variable(i) => substs.get(i)

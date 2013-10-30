@@ -356,6 +356,22 @@ object TreeOps {
     treeCatamorphism(convert, combine, compute, expr)
   }
 
+  def varDeclsOf(expr:Expr) : Set[Identifier] = {
+    def convert(t:Expr) : Set[Identifier] = {
+      Set.empty
+    }
+    def combine(s1 : Set[Identifier], s2 : Set[Identifier]) = s1 ++ s2
+    def compute(t:Expr, s : Set[Identifier]) = t match {
+      case Let(binder,value,body) => s + binder
+      case LetTuple(binders, value, body) => s ++ binders
+      // TODO case LetDef(fd, body) = fd.args map id ++ 
+      case _ => s
+      //FIXME case LetDef(funDef, body) = 
+    }
+    treeCatamorphism(convert, combine, compute, expr)
+
+  }
+
   def variablesOf(expr: Expr) : Set[Identifier] = {
     def convert(t: Expr) : Set[Identifier] = t match {
       case Variable(i) => Set(i)

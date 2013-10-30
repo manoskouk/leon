@@ -5,6 +5,7 @@ import leon._
 import leon.utils._
 import purescala.Definitions._
 import purescala.TypeTrees._
+import purescala.TreeOps._
 import purescala.Trees._
 import purescala.Common._
 
@@ -12,36 +13,27 @@ object MemoizationPhase extends TransformationPhase {
   val name = "Memoization transformation"
   val description = "Transform a program into another, " + 
     "where data stuctures keep Memoization information"
-
-  /*
-  trait TypeDefTree[+A <: ClassTypeDef] {
   
-    val p : Program
-    val classDef : A
-    val parent : Option[TypeDefTree[AbstractClassDef]]
+/*
+  object EnrichTypesPhase extends TransformationPhase {
+    def apply (ctx: LeonContext, p: Program) = {
 
-    val children : List[TypeDefTree[A]]
-    lazy val descendents : List[TypeDefTree[A]]= children match { 
-      case Nil => Nil 
-      case _   => children ++ (children flatMap { _.descendents })
-    }
+      def dbg(x:Any) = ctx.reporter.debug(x.toString)
+      this.ctx = ctx
 
-    lazy val caseDescendents = descendents filter { _.isLeaf }
-    
-    def isLeaf : Boolean = classDef match {
-      case _ : CaseClassDef  => true
-      case _                 => false
-    }
+      //this.ctx = ctx
+      ctx.reporter.info("Hello Memoization!")
 
-    def hasParent = !parent.isEmpty
+
+
   }
-  */
+*/
 
   abstract class MemoClassRecord[+A <: ClassTypeDef](
     val p : Program,
     val classDef : A,
     val parent : Option[MemoClassRecord[AbstractClassDef]] 
-  )  { //extends TypeDefTree[A] {
+  )  { 
     val children : List[MemoClassRecord[_]]
     lazy val descendents : List[MemoClassRecord[_]] = children match { 
       case Nil => Nil 
@@ -63,6 +55,13 @@ object MemoizationPhase extends TransformationPhase {
       case Some(prnt) => fn(this) :: prnt.collectFromTop[A](fn)
     }
 
+    
+
+
+    // Collect something according to fun from the whole tree
+    def collectFromTree[A](fn : MemoClassRecord[_] => A ) : List[A] = {
+      fn(this) :: ( children flatMap { _.collectFromTree(fn) } )
+    }
 
     // The new program resulting from this tree
     def newProgram : List[Definition] = {
@@ -262,10 +261,14 @@ object MemoizationPhase extends TransformationPhase {
           
 
 
-          def refersToType(e : Expr) 
+          def refersToType(e : Expr) = e match {
+            case MatchExpr(scrutinee, cases) if (srcutinee == arg) =>
+              val cs = cases find {   }   
+          }
+            
           searchAndReplace(fn.body) 
             
-        } */
+        }*/
 
         val args = classDef.fields
         Some( new FunDef(
@@ -309,6 +312,7 @@ object MemoizationPhase extends TransformationPhase {
     }
 
   }
+
 
 
   implicit val debugSection = DebugSectionMemoization
@@ -503,99 +507,134 @@ object MemoizationPhase extends TransformationPhase {
 
     //this.ctx = ctx
     ctx.reporter.info("Hello Memoization!")
-
-    
-    val testNew = true
-    if (testNew) {
-      val defTrees = p.classHierarchyRoots.toList map { 
-        case ab : AbstractClassDef => 
-          new MemoAbstractClassRecord(p, ab, None)
-        case cc : CaseClassDef =>
-          new MemoCaseClassRecord(p, cc, None)
-      }
-
-      //dbg ( "I have " + defTrees.length + " trees")
-      val newDefs = defTrees flatMap { _.newProgram }
-      newDefs map (df => dbg(df))
+      
+    val defTrees = p.classHierarchyRoots.toList map { 
+      case ab : AbstractClassDef => 
+        new MemoAbstractClassRecord(p, ab, None)
+      case cc : CaseClassDef =>
+        new MemoCaseClassRecord(p, cc, None)
     }
 
-    else {
+    val newDefs = defTrees flatMap { _.newProgram }
 
-      /* OLD STUFF
-
-      // The functions which will be affected by Memoization and will not 
-      val (affectedFuns, notAffectedFuns) = p.definedFunctions.partition(isAffectedFunction(p,_))
+    // Map of (classDef -> richType) 
+    val typesMap : Map[ClassTypeDef, ClassType] = defTrees.flatMap { _.collectFromTree( 
+      rec => (rec.classDef.asInstanceOf[ClassTypeDef], rec.richType) //FIXME cheating... 
+    )}.toMap
     
-      / *** DEBUG *** /
-      dbg("Affected functions:")
-      affectedFuns.foreach( fn => dbg(fn.id))
-      / *** DEBUG *** /
+    // Map of (oldFun -> newFun). Will contain only funs that are memoized
+    val memoFunsMap = defTrees.flatMap { _.collectFromTree( 
+      rec => rec.classDefRecursiveFuns zip rec.memoizedFuns
+    )}.flatten.toMap
     
+    
+    // The non-memoized functions 
+    val nonMemoFuns = p.definedFunctions filter { fn => 
+      ( memoFunsMap get fn).isEmpty
+    }
+    
+    // Replace all occurences of a variable of an old type
+    // with one of the new type
+    def replaceType(fn : FunDef) : FunDef = {
 
-      val affectedTypes = affectedFuns.groupBy(_.args.head.getType.asInstanceOf[ClassType])
-      //Definitions that will get affected, along with functions and new required classes
-      val affectedDefsMap : Map[ ClassTypeDef, (Seq[FunDef], AbstractClassDef, CaseClassDef ) ] = 
-        affectedTypes map { findClassDefAndMakeFieldConstructs(p,_) }
-
-      / *** DEBUG *** /
-      affectedDefsMap foreach { case (classDef, (funs, abstr, concr) ) => 
-        dbg("Class " + classDef)
-        dbg("is called by funs")
-        funs foreach { fn => dbg("  " + fn.id) }
-        dbg("new types to be created: " + abstr + " and " + concr)
-
+      // All identifiers in fn with class types
+      val ids : List[Identifier] = { 
+        (varDeclsOf(fn.body.get).toList ++ (fn.args map {_.id})).
+        filter { _.getType.isInstanceOf[ClassType] }
+      
       }
-      / *** DEBUG *** /
 
-      // Create the new type forest. Only apply to roots of the forest to not repeat yourself
-      val richDefForest = ( 
-        affectedDefsMap.keySet.toList 
-        filter {!_.hasParent} 
-        map { makeRichClassTree(_, affectedDefsMap) }
-      )
-      // All new types 
-      val richDefs : List[ClassTypeDef]= ( richDefForest flatMap { (classDef : ClassTypeDef) => classDef match {
-        case ab: AbstractClassDef => ab.knownDescendents
-        case cc: CaseClassDef     => List()
-      }} ) ++ richDefForest
-    
-      / *** DEBUG *** /
+      // A map from old to new Identifiers
+      val idsMap = ids. flatMap { id =>
+        typesMap get id.getType.asInstanceOf[ClassType].classDef match {
+          case None     => None
+          case Some(tp) => 
+            val newId  =  FreshIdentifier(id.name)
+            newId setType tp
+            Some(id -> newId)
+        }
+      }. toMap
 
-      dbg("NEW TYPES")
-      richDefs foreach (df => dbg(df) )
-      
-      dbg("OLD TYPES")
-      affectedDefsMap foreach (df => dbg(df._1))
-      / *** DEBUG *** /
-      
 
-      // For the new types, recreate the map that will 
-      val richDefsMap : Map[ ClassTypeDef, Option[(Seq[FunDef], AbstractClassDef, CaseClassDef )] ] = {
-        (richDefs map { rich => rich -> (
-          affectedDefsMap find { _._1.id == rich.id } map { _._2} 
-        )}).toMap
-      }
-      
-      
-      / *** DEBUG *** /
-      dbg("RICH MAP")
-      richDefsMap foreach { df => dbg(df._1)  ;   dbg(df._2)    }
-      / *** DEBUG *** /
-      
-      val retrieveFuns = richDefs map { df => 
-        affectedDefsMap find { _._1.id == df.id } map { fields => makeRetrieveFun(df, fields._2._3) }  
+      // new fun. arguments, replace those you find in idsMap
+      val newArgs : VarDecls = fn.args map { arg => idsMap get arg.id match {
+        case None        => arg
+        case Some(newId) => new VarDecl(newId, newId.getType)
+      }}
+
+      val newRetType = fn.returnType match {
+        case ct: ClassType => 
+          typesMap get ct.classDef match {
+            case None     => ct
+            case Some(tp) => tp
+          }
+        case tp => tp
       }
       
-      / *** DEBUG *** /
-      dbg("RETRIEVE FUNS")
-      retrieveFuns foreach (df => dbg(df) )
-      / *** DEBUG *** /
+      // Change all expressions whose type is in typesMap to the new types.
+      // idsMap is a preconstructed map of identifiers to the corresponding of the new type
+      def typeChange(
+        idsMap : Map[Identifier, Identifier], 
+        typesMap : Map[ClassTypeDef, ClassType],
+        expr : Expr
+      ) : Option[Expr] = expr match {
+        //case Variable(id) 
+        //case Let(binder,value,body)
+        //case LetTuple(binders, value, body)
 
-    *
+        None //FIXME
+        
+
+      }
+
+      val newBody = Some(searchAndReplace(typeChange(idsMap,_))(fn.body.get))
+
+      // new function definition
+      val newFn = new FunDef(fn.id, newRetType, newArgs) 
+
+     
+
+      /*
+      idsMap map { case (x,y) => 
+        dbg(
+          x.name + " : " + x.getType + " || " +
+          y.name + " : " + y.getType
+        )
+      } */
+      fn
+      
+
+      
+    }
+      
+    
+
+
+
+    newDefs map dbg //(df => dbg(df))
+    dbg("IDS-MAP")
+    
+    nonMemoFuns map replaceType
+
+    /*
+    dbg("TYPESMAP")
+    typesMap map {case (x,y) => dbg(x); dbg(y)}
+    dbg("FUNSMAP")
+    memoFunsMap map {case (x,y) => dbg(x); dbg(y)}
+    dbg("NONMEMOFUNS")
+    nonMemoFuns map {x => 
+      dbg(x)
+      dbg("VARDECLS")
+      val ids : List[Identifier] = (
+        varDeclsOf(x.body.get).toList ++ 
+        (x.args map {_.id}) 
+      ) 
+    
+      ids map { x => dbg(x.name + ", " +  x.getType) } 
+    }
     */
-    }
-
     p
+
   }
 
 

@@ -13,21 +13,7 @@ object MemoizationPhase extends TransformationPhase {
   val name = "Memoization transformation"
   val description = "Transform a program into another, " + 
     "where data stuctures keep Memoization information"
-  
-/*
-  object EnrichTypesPhase extends TransformationPhase {
-    def apply (ctx: LeonContext, p: Program) = {
 
-      def dbg(x:Any) = ctx.reporter.debug(x.toString)
-      this.ctx = ctx
-
-      //this.ctx = ctx
-      ctx.reporter.info("Hello Memoization!")
-
-
-
-  }
-*/
 
   abstract class MemoClassRecord[+A <: ClassTypeDef](
     val p : Program,
@@ -47,6 +33,7 @@ object MemoizationPhase extends TransformationPhase {
       case _                 => false
     }
 
+    def classType = classDefToClassType(classDef)
     def hasParent = !parent.isEmpty
   
     // Recursively gather all results of the given function from the top of the tree
@@ -54,10 +41,6 @@ object MemoizationPhase extends TransformationPhase {
       case None       => List(fn(this))
       case Some(prnt) => fn(this) :: prnt.collectFromTop[A](fn)
     }
-
-    
-
-
     // Collect something according to fun from the whole tree
     def collectFromTree[A](fn : MemoClassRecord[_] => A ) : List[A] = {
       fn(this) :: ( children flatMap { _.collectFromTree(fn) } )
@@ -66,21 +49,17 @@ object MemoizationPhase extends TransformationPhase {
     // The new program resulting from this tree
     def newProgram : List[Definition] = {
       val localDefs : List[Definition] =
-        richClassDef ::   
-        { fieldExtractor.toList } ++ 
-        { extraFieldAbstr.toList } ++ 
-        { extraFieldConcr.toList } ++  
-        { constructor.toList } ++
-        {  memoizedFuns } ++ 
-        List()
+        classDef ::    
+        ( List(fieldExtractor,extraFieldAbstr,extraFieldConcr,constructor).flatten ) ++
+        ( memoizedFuns )
       localDefs ++ ( children flatMap { _.newProgram } )
     }
       
     // The rich type corresponding to classDef
-    val richClassDef: A
-    lazy val richType =  classDefToClassType(richClassDef)
+    //val richClassDef: A
+    //lazy val richType =  classDefToClassType(richClassDef)
     
-    def hasExtraFields = !(richClassDef == classDef)
+    protected var hasExtraFields = false //!(richClassDef == classDef)
 
 
     // Functions which recursively call themselves with their only argument being of type classDef
@@ -89,6 +68,11 @@ object MemoizationPhase extends TransformationPhase {
       f.args.size == 1 &&
       f.args.head.getType.asInstanceOf[ClassType].classDef == classDef
     } 
+
+    // Add all memoizes functions from top of the tree as fields
+    def enrichClassDef() : Unit 
+
+    enrichClassDef()
 
 
     // The fields a type has to add are all classDefRecursiveFuns of its ancestors (inclusive)
@@ -105,7 +89,7 @@ object MemoizationPhase extends TransformationPhase {
       // Identifier of the input function
       val oldArg = fn.args.head.id
       // the new argument will have the new type corresponding to this type
-      val newArg = new VarDecl(FreshIdentifier(oldArg.name), richType ) 
+      val newArg = new VarDecl(FreshIdentifier(oldArg.name), classType ) // richType)
       val newFun = new FunDef(
         id = FreshIdentifier(fn.id.name),
         returnType = fn.returnType, // FIXME!!! need to search for the new type corresponding to the old one
@@ -113,7 +97,7 @@ object MemoizationPhase extends TransformationPhase {
       )
       // The object whose field we select is an application of fieldExtractor on newArg
       val argVar = new Variable(newArg.id)
-      argVar.setType(richType)
+      argVar.setType(classType)//richType)
       val bodyObject = new FunctionInvocation( fieldExtractor.get, List(argVar) )
       newFun.body = Some(CaseClassSelector(
         extraFieldConcr.get, 
@@ -125,9 +109,6 @@ object MemoizationPhase extends TransformationPhase {
     }
 
    
-
-    val funsToRenew : List[FunDef]
-    val renewedFuns : List[FunDef]
 
     // Extra fields we are adding to the type. None if there is nothing to add
     lazy val extraFieldAbstr : Option[AbstractClassDef] = {
@@ -163,10 +144,10 @@ object MemoizationPhase extends TransformationPhase {
       // Name of parameter e.g. className
       val paramName = idToLowerCase(classDef.id)
       // Args of resulting function, e.g. ( className : ClassName )
-      val args = List(new VarDecl(paramName, richType)) // classDefToClassType(richClassDef)))
+      val args = List(new VarDecl(paramName, classType)) //richType)) // classDefToClassType(richClassDef)))
 
       // Body of resulting function
-      val body: Expr = richClassDef match { // FIXME changed to rich
+      val body: Expr = classDef match { // richClassDef match { // FIXME changed to rich
         case cc : CaseClassDef =>
           // Here the body is just retreiving the field
           CaseClassSelector(cc, new Variable(idToLowerCase(cc.id)), funName)
@@ -174,7 +155,8 @@ object MemoizationPhase extends TransformationPhase {
           // Construct the cases :
           // The case classes on which we will match
           val caseClasses : List[CaseClassDef]= ( this.caseDescendents 
-            map { _.richClassDef.asInstanceOf[CaseClassDef] } 
+            //map { _.richClassDef.asInstanceOf[CaseClassDef] } 
+            map { _.classDef.asInstanceOf[CaseClassDef] } 
           )
           // Case patterns
           val patterns = caseClasses map { cc => 
@@ -227,62 +209,152 @@ object MemoizationPhase extends TransformationPhase {
   ) extends MemoClassRecord[CaseClassDef](p,classDef,parent) {
     
     val children: List[MemoClassRecord[CaseClassDef]] = Nil
-    val funsToRenew: List[FunDef] = Nil // FIXME 
-    val renewedFuns: List[FunDef] = Nil // FIXME 
+       
+    //val richClassDef: CaseClassDef = 
 
-    // Here some real work is done: we may have to add a field if we have any functions
-    val richClassDef: CaseClassDef = {
+    // Add all memoizes functions from top of the tree as fields
+    def enrichClassDef() : Unit = { 
       val allExtraFields = collectFromTop(_.extraFieldConcr).flatten.map{varFromClassDef(_)}
-      if (allExtraFields.isEmpty) classDef
+      if (allExtraFields.isEmpty) { }   
       else {
-        val newCc = new CaseClassDef(classDef.id.freshen)
-        newCc.fields = classDef.fields.toList ++ allExtraFields
-        // FIXME maybe renew all fields?
-        parent match {
-          case Some(prnt) => newCc.setParent(prnt.richClassDef)
-          case None =>
-        }
-        newCc
+        classDef.fields = classDef.fields ++ allExtraFields
+        hasExtraFields = true
       }
     }
+
   
     val constructor: Option[FunDef] = { 
       if (!hasExtraFields) None 
-      else { /*
-        // Find all functions which define fields
-        val memoFuns = collectFromTop(_.classDefRecursiveFuns).flatten
+      else {        
+        
+        // Take all fields of the class except the new one
+        val args = classDef.fields.take(classDef.fields.length - 1) map { 
+          arg => new VarDecl(arg.id.freshen, arg.tpe) 
+        }
+       
+        // Take an expression and isolate the case relevant for this constructor function
+        // funArg is the argument of the original function
+        // args are the arguments of the constructor function
+        def isolateCase(expr: Expr, funArg : Identifier, args:VarDecls) : Option[Expr] = expr match {
+          case MatchExpr(vr@Variable(id),cases) if (funArg == id) => { 
+            
+
+            // Relevant patterns are: 
+            // Wildcard
+            // CaseClassPattern with classDef
+            // instanceOf with supertype of classDef
+
+            def hasRelevantPattern(mc : MatchCase) : Boolean = mc.pattern match { 
+              case WildcardPattern(_) => true
+              case CaseClassPattern(_, cc, subPatts) => cc == classDef
+              case InstanceOfPattern(_, cc@CaseClassDef(_,_,_))   => cc == classDef
+              case InstanceOfPattern(_, ab@AbstractClassDef(_,_)) => ab.knownDescendents contains classDef
+              case _ => false
+            } //FIXME
+          
+            // Now keep only relevant cases. 
+            // These will be either: 
+            //    one instanceOf pattern, 
+            //    or a wildcard, 
+            //    or a series of caseClass or guarded patterns
+            //      possibly followed by either a wildcard of InstanceOf (which will then be "catch-all")
+            val relCases = cases filter hasRelevantPattern 
+
+            val relCases2 = relCases takeWhile { cas => 
+              cas.pattern.isInstanceOf[CaseClassPattern] || cas.hasGuard
+            }
+             
+            val relevantCases = {
+              if      (relCases.length == 1) relCases // One case
+              else if (relCases.length == relCases2.length) relCases2 // All are CaseClassPatterns
+              else    { // Neither of those. Put all CaseClassPatterns and a catch-all in the end
+                val extraCase = relCases(relCases2.length) 
+                relCases2 :+ SimpleCase(WildcardPattern(extraCase.pattern.binder), extraCase.rhs)
+                // FIXME : guards not handled properly!!!
+              }
+            }
+
+            // Unfold a MatchCase 
+            // constrArgs are the arguments of the constructor function
+            // Partially implemented FIXME 
+            def unfoldCase(mc: MatchCase, constrArgs: VarDecls) : MatchCase = mc match {
+              case SimpleCase(CaseClassPattern(None, _, subPatts), rhs) => 
+                val newPatt = TuplePattern(None, subPatts)
+                SimpleCase(newPatt, rhs) 
+              case _ => scala.sys.error("unfoldCase partially implemented")
+              //case GuardedCase(patt, rhs) => scala.sys.error("Guarded pattern unfolding not implemented yet!")//FIXME 
+                
+            }
+            
+            if (args.size == 0 ) {
+              Some(relevantCases.head.rhs) // FIXME
+            }
+            //else if (args.size == 1) {
+            //  None
+            //}
+            else {
+              val newScrut = Tuple(args map { arg => new Variable(arg.id) })
+              Some( MatchExpr(newScrut, relevantCases map {unfoldCase(_, args)}) )// FIXME: this works for CaseClassPatterns only
+            }
+
+          }
+
+          case MatchExpr(Tuple(_),_) => None // FIXME!!!
+
+          case FunctionInvocation(_,_) => None // FIXME: functions with the ready structure have to be unfolded or substituted with the resp. field
+
+          case _ => None 
+        }
+        
+        // Take a the new concrete field with relevant functions 
+        // and extract the relevant part of the function result into variables
+        def processField(cc : CaseClassDef, funs : List[FunDef]) : (CaseClassDef, List[(Identifier,Expr)]) = {
+          val fieldsWithFuns = cc.fields zip funs
+          val snd = fieldsWithFuns.toList map { case (field, fun) =>
+            ( 
+              { val id = FreshIdentifier(field.id.name + "_"); id.setType(field.id.getType); id }, 
+              searchAndReplace(x => isolateCase(x,fun.args.head.id,args ))(fun.body.get) 
+            )
+          }
+          (cc, snd)
+        }
+
+        
+        val allExtraFieldsWithFuns : List[ (CaseClassDef, List[(Identifier,Expr)]) ] = collectFromTop {
+          rec => (rec.extraFieldConcr, rec.classDefRecursiveFuns) 
+        }.filter { _._1.isDefined }. map { case (Some(cc), funs) => processField(cc,funs) }
+        
+        val producedFields : List[Expr] = {
+          allExtraFieldsWithFuns map { 
+            case (cc, idsWithExprs) => 
+              CaseClass( cc, idsWithExprs map { case(id,_) => Variable(id) } )
+          }
+        }
+
+        val returnValue : Expr = CaseClass(
+          classDef, 
+          (args map { arg => Variable(arg.id) }) ++ producedFields
+        )
+      
+        def makeLetDef( idValue : (Identifier, Expr) , bd : Expr) = Let(idValue._1, idValue._2, bd)  
+
+        val body = (allExtraFieldsWithFuns flatMap { _._2 }). :\ (returnValue)(makeLetDef)
         
 
-        // Take a function with argument a supertype of classDef and 
-        // isolate the match cases concerning classDef
-        def isolateMatchCase (fn : FunDef) : Expr = {
-          val arg = fn.args.head
-
-          
-
-
-          def refersToType(e : Expr) = e match {
-            case MatchExpr(scrutinee, cases) if (srcutinee == arg) =>
-              val cs = cases find {   }   
-          }
-            
-          searchAndReplace(fn.body) 
-            
-        }*/
-
-        val args = classDef.fields
-        Some( new FunDef(
+        val res = new FunDef(
           FreshIdentifier("create" + classDef.id.name),
-          richType,
-          args // FIXME!!!
-        ))
-
+          classType, //richType,
+          args 
+        )
+        
+        res. body = Some(body)
+        Some(res)
 
         //FIXME add body
       }
     }
-
   }
+  
 
   class MemoAbstractClassRecord (
     p : Program,
@@ -291,17 +363,6 @@ object MemoizationPhase extends TransformationPhase {
   ) extends MemoClassRecord[AbstractClassDef](p,classDef,parent) {
     
     val constructor: Option[FunDef] = None
-    val funsToRenew: List[FunDef] = Nil // FIXME
-    val renewedFuns: List[FunDef] = Nil // FIXME 
-    val richClassDef: AbstractClassDef = {
-      val newAb = 
-        new AbstractClassDef(classDef.id.freshen )
-      parent match {
-        case Some(prnt) => newAb setParent prnt.richClassDef
-        case None       =>
-      }
-      newAb
-    }
     
     // recursive! 
     val children : List[MemoClassRecord[ClassTypeDef]]= classDef.knownChildren.toList map {
@@ -311,6 +372,8 @@ object MemoizationPhase extends TransformationPhase {
         new MemoCaseClassRecord(p, cc, Some(this))
     }
 
+
+    def enrichClassDef = { } 
   }
 
 
@@ -336,169 +399,63 @@ object MemoizationPhase extends TransformationPhase {
     FreshIdentifier(nm.updated(0,nm.head.toLower))
   }
 
+  
   /*
-   * OLD STUFF
+   * Replace:
    *
-
-  // Find which functions are affected by the transformation
-  def isAffectedFunction(p : Program, f : FunDef) = {
-      p.transitivelyCalls(f,f) && 
-      f.args.size == 1 &&
-      f.args.head.getType.isInstanceOf[ClassType]
-  }
-
-  // From type and related functions, find the relevant type declaration and make related new types
-  def findClassDefAndMakeFieldConstructs(p : Program, tpFuns : (ClassType, Seq[FunDef])) = tpFuns match {
-    case (tp, funs) => {
-      val defin = p.definedClasses.find(_.id == tp.id).
-          getOrElse(scala.sys.error("Did not find definition for type " + tp.id.toString))
-      val (abst, concr) = makeFieldsConstruct(defin, funs)
-      ( defin, (funs, abst, concr)  )  
-    }
-  }
-
-
-  // Construct the new type with all the extra fields
-  def makeFieldsConstruct( classDef : ClassTypeDef, funs: Seq[FunDef] ) : (AbstractClassDef, CaseClassDef) = {
-   
-    val abstr = new AbstractClassDef(id = FreshIdentifier(classDef.id + "FieldsAbstract"))
-    
-    val concr = new CaseClassDef(id = FreshIdentifier(classDef.id + "Fields") )
-    concr.setParent(abstr)
-    concr.fields = funs map {fn => new VarDecl(fn.id, fn.returnType) } 
-
-    (abstr, concr)
-
-  }
-
-
-    
-  *
-  */
-
-  /*
-   * Take a class tree under classDef, and the new fields to be added,
-   * and recursively reconstruct it with the new fields
+   *  old function invocation with new one
+   *  matchings with an extra matching
+   *  constructors of old case classes with new constructor functions
+   *
+   * This is meant to be passed as an argument in searchAndReplace
    */
 
-
-  /*
-  def makeRichClassTree(classDef: ClassTypeDef,  
-    affectedDefsMap : Map[ ClassTypeDef, (Seq[FunDef], AbstractClassDef, CaseClassDef ) ]
-  ) : ClassTypeDef = {
-    
-    // current tree point, field inherited from father
-     
-    def rec (classDef: ClassTypeDef, ancestorFields: Seq[VarDecl] ) : ClassTypeDef = {
-
-      // Find the concrete fields to add in the definition map
-      def getNewFields(classDef : ClassTypeDef) : Option[CaseClassDef] = {
-        (affectedDefsMap get classDef) map { _._3 } 
+  def memoReplace ( 
+    expr : Expr, 
+    memoFunsMap : Map[FunDef,FunDef],
+    constructorMap : Map[CaseClassDef, FunDef]
+  ) : Option[Expr] = expr match {
+    case FunctionInvocation(funDef,args) => 
+      memoFunsMap get funDef match {
+        case None        => None
+        case Some(newFn) => Some(FunctionInvocation(newFn,args))
       }
-
-      // Take a ClassTypeDef and make a field with the same name (lower-case) 
-      // and the correct type
-      def varFromClassDef(cc : ClassTypeDef) : VarDecl = {
-        val newId = idToLowerCase(cc.id)
-        new VarDecl(newId, classDefToClassType(cc) )
+    
+    case me : MatchExpr => 
+      // Give a pattern an extra wildcard in the end, if needed (recursive)
+      def fixPattern(p: Pattern) : Pattern = p match {
+        case CaseClassPattern(binder,caseClassDef, subPatterns) =>
+          // Side effects should ensure result of renewing type are visible here
+          if (caseClassDef.fields.length == subPatterns.length) p
+          else 
+            CaseClassPattern(
+              binder, 
+              caseClassDef, 
+              (subPatterns map fixPattern) :+ WildcardPattern(None)
+            )
+        case TuplePattern(binder, subPatterns) => TuplePattern(binder, subPatterns map fixPattern)
+        case _ => p          
       }
       
-      classDef match {
-        case cc : CaseClassDef => 
-          val newCc = new CaseClassDef(cc.id)
-          // Keep old fields, add the extra from this class plus given from parent
-          newCc.fields = getNewFields(cc) match {
-            case None     => cc.fields ++ ancestorFields
-            case Some(cl) => cc.fields ++ ( varFromClassDef(cl) +: ancestorFields )
-          }
-          newCc
-
-        case ab : AbstractClassDef => 
-          // initialize object
-          val newAb = new AbstractClassDef(ab.id)
-          // Find what fields you have to add to children and rec. create them
-          val passedDownFields = getNewFields(ab) match {
-            case None => ancestorFields
-            case Some(cl) => varFromClassDef(cl) +: ancestorFields
-          }
-          val newChildren = ab.knownChildren map { ch => rec(ch, passedDownFields) }
-          // Register the new object as parents of the children
-          newChildren foreach { _.setParent(newAb) }
-          newAb
+      def fixCase(mc : MatchCase) : MatchCase = mc match {
+        case SimpleCase (patt,        rhs) => SimpleCase (fixPattern(patt),        rhs)
+        case GuardedCase(patt, guard, rhs) => GuardedCase(fixPattern(patt), guard, rhs)
       }
+
+      Some( new MatchExpr(me.scrutinee, me.cases map fixCase) )
+      
+
+    case CaseClass(classDef, args) => constructorMap get classDef match {
+      case None         => None 
+      case Some(constr) => Some( new FunctionInvocation(constr, args) )
     }
+      
 
-
-    rec(classDef, List[VarDecl]())
-
-  }
-*/
-
-/*
-  // Make a function that retrieves the newly created fields from the new types
-  def makeRetrieveFun(classDef : ClassTypeDef, //Tree 
-    field : CaseClassDef //TreeFields
-  ) = {
-
-    // Name of the field
-    //val fieldId = FreshIdentifier(classDef.id.toString ++ "Fields", 
-    // Name of resulting function
-    val funName = idToLowerCase(field.id) // treeFields
-    // Return type of res. function
-    val retType = classDefToClassType(field) // TreeFields
-    // Args of resulting function
-    val args = List(new VarDecl(idToLowerCase(classDef.id) , classDefToClassType(classDef) ))
-
-    // Body of resulting function
-    val body: Expr = classDef match {
-      case cc : CaseClassDef =>
-        // Here the body is just retreiving the field
-        CaseClassSelector(cc, new Variable(idToLowerCase(cc.id)), funName)
-      case ab : AbstractClassDef => {
-        // Construct the cases :
-        // The case classes on which we will match
-        val caseClasses = ( ab.knownDescendents 
-          filter { _.isInstanceOf[CaseClassDef] } 
-          map { _.asInstanceOf[CaseClassDef] }
-        )
-        // Case patterns
-        val patterns = caseClasses map { cc => 
-          new CaseClassPattern( 
-            binder       = Some(idToLowerCase(cc.id)),
-            caseClassDef = cc,
-            // FIXME this is a dodgy way to create repeated _'s of the correct size
-            subPatterns  = cc.fields map (_ => new WildcardPattern(None))
-          )
-        }
-        // case bodies
-        val caseBodies = caseClasses map { cc => 
-          //dbg(cc.toString)
-          //dbg(funName.toString)
-          new CaseClassSelector(cc, new Variable(idToLowerCase(cc.id)), cc.fields.find(_.id.name == funName.name ).get.id)
-        }
-        
-        // complete cases
-        val cases = (patterns zip caseBodies) map { case (patt, bd) => new SimpleCase(patt, bd) }
-
-        // the variable to do case analysis on
-        val scrutinee = new Variable(idToLowerCase(ab.id))
-        scrutinee.setType(classDefToClassType(ab))
-
-        // The complete match expr.
-        MatchExpr(scrutinee, cases)
-      }
-    }
-
-    // Now construct the whole definition and add body
-    val funDef = new FunDef(funName, retType, args)
-    funDef.body = Some(body)
-
-    funDef
+    case _ => None
   }
 
-*/
-  // FIXME: Dirty :(
-  //private var ctx: LeonContext = null 
+
+
 
   def apply (ctx: LeonContext, p: Program) = {
 
@@ -516,125 +473,45 @@ object MemoizationPhase extends TransformationPhase {
     }
 
     val newDefs = defTrees flatMap { _.newProgram }
-
-    // Map of (classDef -> richType) 
-    val typesMap : Map[ClassTypeDef, ClassType] = defTrees.flatMap { _.collectFromTree( 
-      rec => (rec.classDef.asInstanceOf[ClassTypeDef], rec.richType) //FIXME cheating... 
-    )}.toMap
     
     // Map of (oldFun -> newFun). Will contain only funs that are memoized
     val memoFunsMap = defTrees.flatMap { _.collectFromTree( 
       rec => rec.classDefRecursiveFuns zip rec.memoizedFuns
     )}.flatten.toMap
     
-    
     // The non-memoized functions 
     val nonMemoFuns = p.definedFunctions filter { fn => 
       ( memoFunsMap get fn).isEmpty
     }
-    
-    // Replace all occurences of a variable of an old type
-    // with one of the new type
-    def replaceType(fn : FunDef) : FunDef = {
-
-      // All identifiers in fn with class types
-      val ids : List[Identifier] = { 
-        (varDeclsOf(fn.body.get).toList ++ (fn.args map {_.id})).
-        filter { _.getType.isInstanceOf[ClassType] }
-      
-      }
-
-      // A map from old to new Identifiers
-      val idsMap = ids. flatMap { id =>
-        typesMap get id.getType.asInstanceOf[ClassType].classDef match {
-          case None     => None
-          case Some(tp) => 
-            val newId  =  FreshIdentifier(id.name)
-            newId setType tp
-            Some(id -> newId)
-        }
-      }. toMap
 
 
-      // new fun. arguments, replace those you find in idsMap
-      val newArgs : VarDecls = fn.args map { arg => idsMap get arg.id match {
-        case None        => arg
-        case Some(newId) => new VarDecl(newId, newId.getType)
-      }}
-
-      val newRetType = fn.returnType match {
-        case ct: ClassType => 
-          typesMap get ct.classDef match {
-            case None     => ct
-            case Some(tp) => tp
-          }
-        case tp => tp
-      }
-      
-      // Change all expressions whose type is in typesMap to the new types.
-      // idsMap is a preconstructed map of identifiers to the corresponding of the new type
-      def typeChange(
-        idsMap : Map[Identifier, Identifier], 
-        typesMap : Map[ClassTypeDef, ClassType],
-        expr : Expr
-      ) : Option[Expr] = expr match {
-        //case Variable(id) 
-        //case Let(binder,value,body)
-        //case LetTuple(binders, value, body)
-
-        None //FIXME
-        
-
-      }
-
-      val newBody = Some(searchAndReplace(typeChange(idsMap,_))(fn.body.get))
-
-      // new function definition
-      val newFn = new FunDef(fn.id, newRetType, newArgs) 
-
-     
-
-      /*
-      idsMap map { case (x,y) => 
-        dbg(
-          x.name + " : " + x.getType + " || " +
-          y.name + " : " + y.getType
-        )
-      } */
-      fn
+    // Map of type -> constructor. only keep CaseClasses with constructors
+    val constructorMap : Map[CaseClassDef, FunDef] = defTrees.flatMap { 
+      _.collectFromTree { rec => (rec.classDef, rec.constructor) }
+    }.filter { _._2.isDefined }.map {
+      case (cc, Some(constr)) => (cc.asInstanceOf[CaseClassDef], constr)
+    }.toMap
       
 
-      
+    // New non-memo functions, compatible with new types function
+    val newNonMemoFuns = nonMemoFuns map { fn =>
+      val newBody = searchAndReplace( 
+        ex => memoReplace(ex, memoFunsMap, constructorMap)
+      )(fn.body.get)
+      val newFun = new FunDef(fn.id, fn.returnType, fn.args)
+      newFun.body = Some(newBody)
+      newFun
     }
-      
-    
+
+    // FIXME : Do similarly for values too
+    // FIXME :                  annotations (anything else???)
 
 
-
-    newDefs map dbg //(df => dbg(df))
-    dbg("IDS-MAP")
-    
-    nonMemoFuns map replaceType
-
-    /*
-    dbg("TYPESMAP")
-    typesMap map {case (x,y) => dbg(x); dbg(y)}
-    dbg("FUNSMAP")
-    memoFunsMap map {case (x,y) => dbg(x); dbg(y)}
-    dbg("NONMEMOFUNS")
-    nonMemoFuns map {x => 
-      dbg(x)
-      dbg("VARDECLS")
-      val ids : List[Identifier] = (
-        varDeclsOf(x.body.get).toList ++ 
-        (x.args map {_.id}) 
-      ) 
-    
-      ids map { x => dbg(x.name + ", " +  x.getType) } 
-    }
-    */
+    // DEBUGGING!
+    newDefs map dbg 
+    newNonMemoFuns map dbg
     p
-
+   
   }
 
 

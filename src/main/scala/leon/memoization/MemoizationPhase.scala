@@ -96,7 +96,7 @@ object MemoizationPhase extends TransformationPhase {
         args = List(newArg)
       )
       // The object whose field we select is an application of fieldExtractor on newArg
-      val argVar = new Variable(newArg.id)
+      val argVar = Variable(newArg.id)
       argVar.setType(classType)//richType)
       val bodyObject = new FunctionInvocation( fieldExtractor.get, List(argVar) )
       newFun.body = Some(CaseClassSelector(
@@ -150,7 +150,7 @@ object MemoizationPhase extends TransformationPhase {
       val body: Expr = classDef match { // richClassDef match { // FIXME changed to rich
         case cc : CaseClassDef =>
           // Here the body is just retreiving the field
-          CaseClassSelector(cc, new Variable(idToLowerCase(cc.id)), funName)
+          CaseClassSelector(cc, Variable(idToLowerCase(cc.id)), funName)
         case ab : AbstractClassDef => {
           // Construct the cases :
           // The case classes on which we will match
@@ -173,7 +173,7 @@ object MemoizationPhase extends TransformationPhase {
             //dbg(funName.name)
             new CaseClassSelector(
               cc, 
-              new Variable(idToLowerCase(cc.id)), // FIXME maybe needs the pattern binder
+              Variable(idToLowerCase(cc.id)), // FIXME maybe needs the pattern binder
               cc.fields.find( _.id.name == funName.name ).get.id
             )
           }
@@ -182,7 +182,7 @@ object MemoizationPhase extends TransformationPhase {
           val cases = (patterns zip caseBodies) map { case (patt, bd) => new SimpleCase(patt, bd) }
 
           // the variable to do case analysis on
-          val scrutinee = new Variable(paramName)
+          val scrutinee = Variable(paramName)
           scrutinee.setType(classDefToClassType(ab))
 
           // The complete match expr.
@@ -244,12 +244,12 @@ object MemoizationPhase extends TransformationPhase {
         val assignedToVals : List[List[Identifier]] = extraCaseClasses map { 
           _.fields.toList map { field =>
             val id = FreshIdentifier(field.id.name + "_")
-            id.setType(field.id.getType)
+            id.setType(field.getType) // TODO: WHY DOES VARDECL OVERRIDE GETTYPE? :'(
             id
           }
         }
 
-        
+        val funsValsMap = (extraFuns.flatten zip assignedToVals.flatten).toMap 
 
         // Take an expression and isolate the case relevant for this constructor function
         // funArg is the argument of the original function
@@ -311,17 +311,48 @@ object MemoizationPhase extends TransformationPhase {
             //  None
             //}
             else {
-              val newScrut = Tuple(args map { arg => new Variable(arg.id) })
+              val newScrut = Tuple(args map { arg => Variable(arg.id) })
               Some( MatchExpr(newScrut, relevantCases map {unfoldCase(_, args)}) )// FIXME: this works for CaseClassPatterns only
             }
 
           }
 
           case MatchExpr(Tuple(_),_) => None // FIXME!!!
+          
           // FIXME: Generally, we need to catch all expressions mentioning funArg
 
           // 
-          case FunctionInvocation(funDef, args) => None 
+          case FunctionInvocation(funDef, args_) if (args_ contains Variable(funArg)) => {
+            
+            if (extraFuns exists (_ contains funDef)) { //FIXME slow
+              // If you made a field for this function call, use it
+              //val x = funsValsMap get funDef //map Variable
+              //dbg(x.get.toString + ", " + x.get.getType)
+              //x map Variable
+              funsValsMap get funDef map Variable
+            }
+            else {
+              // Otherwise, unfold function definition into a val
+              //val assingedToVal = FreshIdentifier(funDef.id.name + "_")
+              //assignedToVal.setType(funDef.returnType)
+              
+              // Isolate the case in the old body function
+              val isolatedBody = //funDef.body.get
+                searchAndReplace(x=> isolateCase(x,funDef.args.head.id,args))( funDef.body.get) // FIXME : correct parameters in isolateCase???
+              // Let value is isolated funbody, but replace typical parameters with actual
+              val letValue = replaceFromIDs( 
+                ( funDef.args.map{ _.id } zip args.map{arg => Variable(arg.id)}).toMap,
+                isolatedBody 
+              )
+              Some(letValue)
+              // lastly, make a let expression where you put the new assigned
+              // value in place of the old function call
+              //Some (Let(assignedToVal, letValue, Variable(assignedToVal)))
+
+
+            }
+
+          }
           case _ => None 
         }
         

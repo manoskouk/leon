@@ -227,11 +227,30 @@ object MemoizationPhase extends TransformationPhase {
       if (!hasExtraFields) None 
       else {        
         
-        // Take all fields of the class except the new one
+        // The arguments of the new function. Correspond to the old fields of classDef  
         val args = classDef.fields.take(classDef.fields.length - 1) map { 
           arg => new VarDecl(arg.id.freshen, arg.tpe) 
         }
        
+        // Extra fields we are adding to classDef
+        val extraCaseClasses : List[CaseClassDef] = 
+          collectFromTop { _.extraFieldConcr } filter { _.isDefined } map { _.get }
+
+        // Functions corresponding to the extra fields
+        val extraFuns : List[List[FunDef]] = 
+          collectFromTop { _.classDefRecursiveFuns } filter { !_.isEmpty }
+
+        // The new vals we are going to be assigning the results of calling old function code into
+        val assignedToVals : List[List[Identifier]] = extraCaseClasses map { 
+          _.fields.toList map { field =>
+            val id = FreshIdentifier(field.id.name + "_")
+            id.setType(field.id.getType)
+            id
+          }
+        }
+
+        
+
         // Take an expression and isolate the case relevant for this constructor function
         // funArg is the argument of the original function
         // args are the arguments of the constructor function
@@ -282,8 +301,7 @@ object MemoizationPhase extends TransformationPhase {
                 val newPatt = TuplePattern(None, subPatts)
                 SimpleCase(newPatt, rhs) 
               case _ => scala.sys.error("unfoldCase partially implemented")
-              //case GuardedCase(patt, rhs) => scala.sys.error("Guarded pattern unfolding not implemented yet!")//FIXME 
-                
+                              
             }
             
             if (args.size == 0 ) {
@@ -300,12 +318,20 @@ object MemoizationPhase extends TransformationPhase {
           }
 
           case MatchExpr(Tuple(_),_) => None // FIXME!!!
+          // FIXME: Generally, we need to catch all expressions mentioning funArg
 
-          case FunctionInvocation(_,_) => None // FIXME: functions with the ready structure have to be unfolded or substituted with the resp. field
-
+          // 
+          case FunctionInvocation(funDef, args) => None 
           case _ => None 
         }
         
+        // The expressions to be assigned to the new vals
+        val assignedExprs : List[List[Expr]] = extraFuns map { 
+          _ map { fun =>
+            searchAndReplace(x => isolateCase(x,fun.args.head.id,args))(fun.body.get) 
+          }
+        }
+/*
         // Take a the new concrete field with relevant functions 
         // and extract the relevant part of the function result into variables
         def processField(cc : CaseClassDef, funs : List[FunDef]) : (CaseClassDef, List[(Identifier,Expr)]) = {
@@ -319,26 +345,35 @@ object MemoizationPhase extends TransformationPhase {
           (cc, snd)
         }
 
-        
         val allExtraFieldsWithFuns : List[ (CaseClassDef, List[(Identifier,Expr)]) ] = collectFromTop {
           rec => (rec.extraFieldConcr, rec.classDefRecursiveFuns) 
         }.filter { _._1.isDefined }. map { case (Some(cc), funs) => processField(cc,funs) }
-        
+*/
+
+        // The expressions which will initialize the extra fields 
+        val fieldInitializers : List[Expr] = (extraCaseClasses zip assignedToVals) map {
+          case (cc, ids) => CaseClass(cc, ids map { id => Variable(id) })
+        }
+       /* 
         val producedFields : List[Expr] = {
           allExtraFieldsWithFuns map { 
             case (cc, idsWithExprs) => 
               CaseClass( cc, idsWithExprs map { case(id,_) => Variable(id) } )
           }
         }
-
+*/
+        // The final return value of the function
         val returnValue : Expr = CaseClass(
           classDef, 
-          (args map { arg => Variable(arg.id) }) ++ producedFields
+          (args map { arg => Variable(arg.id) }) ++ fieldInitializers //producedFields
         )
       
+        // Function to fold over all assignments to create body
         def makeLetDef( idValue : (Identifier, Expr) , bd : Expr) = Let(idValue._1, idValue._2, bd)  
 
-        val body = (allExtraFieldsWithFuns flatMap { _._2 }). :\ (returnValue)(makeLetDef)
+        val body = ( assignedToVals.flatten zip assignedExprs.flatten ). :\ (returnValue)(makeLetDef)
+
+        //val body = (allExtraFieldsWithFuns flatMap { _._2 }). :\ (returnValue)(makeLetDef)
         
 
         val res = new FunDef(
@@ -350,7 +385,6 @@ object MemoizationPhase extends TransformationPhase {
         res. body = Some(body)
         Some(res)
 
-        //FIXME add body
       }
     }
   }

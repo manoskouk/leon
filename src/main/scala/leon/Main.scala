@@ -31,15 +31,14 @@ object Main {
       LeonFlagOptionDef ("synthesis",   "--synthesis",          "Partial synthesis of choose() constructs"),
       LeonFlagOptionDef ("xlang",       "--xlang",              "Support for extra program constructs (imperative,...)"),
       LeonValueOptionDef("debug",       "--debug=<sections..>", "Enables specific messages"),
-      LeonFlagOptionDef("memo" ,        "--memo",
-        "Memoization transformation"),
+      LeonValueOptionDef("memo" ,       "--memo=<output file>", "Memoization transformation"),
       LeonFlagOptionDef ("help",        "--help",               "Show help")
     )
 
   lazy val allOptions = allComponents.flatMap(_.definedOptions) ++ topLevelOptions
 
   def displayHelp(reporter: Reporter) {
-    reporter.info("usage: leon [--xlang] [--termination] [--synthesis] [--help] [--debug=<N>] [..] <files>")
+    reporter.info("usage: leon [--xlang] [--termination] [--synthesis] [--memo] [--help] [--debug=<N>] [..] <files>")
     reporter.info("")
     for (opt <- topLevelOptions.toSeq.sortBy(_.name)) {
       reporter.info("%-20s %s".format(opt.usageOption, opt.usageDesc))
@@ -142,8 +141,11 @@ object Main {
         settings = settings.copy(synthesis = value)
       case LeonFlagOption("xlang", value) =>
         settings = settings.copy(xlang = value)
-      case LeonFlagOption("memo", value) =>
-        settings = settings.copy(memo = value)
+      case LeonValueOption("memo", value) =>
+        if (value forall {_.isWhitespace}) 
+          settings = settings.copy(memo = "memo.out")
+        else 
+          settings = settings.copy(memo = value)
       case LeonValueOption("debug", ListValue(sections)) =>
         val debugSections = sections.flatMap { s =>
           if (s == "all") {
@@ -200,7 +202,7 @@ object Main {
         termination.TerminationPhase
       } else if (settings.xlang) {
         xlang.XlangAnalysisPhase
-      } else if (settings.memo) {
+      } else if (settings.memo != "") {
         Memoization.MemoizationPhase
       } else if (settings.verify) {
         verification.AnalysisPhase

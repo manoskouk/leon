@@ -98,7 +98,7 @@ case object DebugSectionTimers       extends DebugSection("timers",       1 << 2
 case object DebugSectionOptions      extends DebugSection("options",      1 << 3)
 case object DebugSectionVerification extends DebugSection("verification", 1 << 4)
 case object DebugSectionTermination  extends DebugSection("termination",  1 << 5)
-case object DebugSectionMemoisation  extends DebugSection("memoisation" , 1 << 6)
+case object DebugSectionMemoization  extends DebugSection("memoization" , 1 << 6)
 
 object DebugSections {
   val all = Set[DebugSection](

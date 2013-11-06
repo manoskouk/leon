@@ -574,7 +574,8 @@ object MemoizationPhase extends TransformationPhase {
       )}
     ))
 
-    newProg.writeScalaFile("/home/manos/Desktop/" + newProg.id.name + ".scala")
+    // FIXME: REMOVE HARD LINK!
+    newProg.writeScalaFile(ctx.settings.memo)
 
     newProg
 

@@ -49,6 +49,19 @@ object Simple {
     case Foo2() if false  => 1
   }
 
+  /**************/
+  // Test CaseClass* expressions
 
+  abstract sealed class Bar
+  case class Bar1(b:Bar) extends Bar
+  case class Bar2(i:Int) extends Bar
+  def barFun(b : Bar) : Int = b match {
+    case Bar1(bb) => barFun(bb) + (
+      if (b.isInstanceOf[Bar2]) 0 else 1
+    )
+    case bb@Bar2(i) => bb.i + (
+      if (bb.isInstanceOf[Bar2]) 0 else 1
+    )
 
+  }
 }

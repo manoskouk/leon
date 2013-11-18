@@ -96,14 +96,15 @@ object MemoizationPhase extends TransformationPhase {
       localDefs ++ (children flatMap { _.newConstructors } )
     }
 
+    // How many fields were added to the class
     protected var extraFieldsNo = 0
 
 
     // Add all memoized functions from top of the tree as fields
+    // Works with side effects! 
     def enrichClassDef() : Unit 
-
     enrichClassDef()
-       
+      
 
 
     // New versions of funsToMemoize, utilizing the memoized field
@@ -224,55 +225,55 @@ object MemoizationPhase extends TransformationPhase {
     }
 
   
-    val constructor: Option[FunDef] = { 
-      if (extraFieldsNo == 0) None 
-      else {        
-        
-        // The arguments of the new function. Correspond to the old fields of classDef  
-        val args = classDef.fields.take(classDef.fields.length - extraFieldsNo) map { 
-          field => field.id.freshen.setType(field.tpe)
+    val constructor: Option[FunDef] = if (extraFieldsNo == 0) None else {        
+      
+      // The arguments of the new function. Correspond to the old fields of classDef  
+      val args = classDef.fields.take(classDef.fields.length - extraFieldsNo) map { 
+        field => field.id.freshen.setType(field.tpe)
+      }
+     
+      // Extra fields we are adding to classDef
+      val extraCaseClasses : List[CaseClassDef] = 
+        collectFromTop { _.extraFieldConcr } collect { case Some(x) => x }
+      // Functions corresponding to the extra fields
+      val extraFuns : List[List[FunDef]] = 
+        collectFromTop { _.classDefRecursiveFuns } filter { !_.isEmpty }
+
+      // The new vals we are going to be assigning the results of calling old function code into
+      val assignedToVals : List[List[Identifier]] = extraCaseClasses map { 
+        _.fields.toList map { field =>
+          FreshIdentifier(field.id.name + "_").setType(field.getType) 
+          // TODO: WHY DOES VARDECL OVERRIDE GETTYPE? :'(
         }
-       
-        // Extra fields we are adding to classDef
-        val extraCaseClasses : List[CaseClassDef] = 
-          collectFromTop { _.extraFieldConcr } collect { case Some(x) => x }
-        // Functions corresponding to the extra fields
-        val extraFuns : List[List[FunDef]] = 
-          collectFromTop { _.classDefRecursiveFuns } filter { !_.isEmpty }
+      }
 
-        // The new vals we are going to be assigning the results of calling old function code into
-        val assignedToVals : List[List[Identifier]] = extraCaseClasses map { 
-          _.fields.toList map { field =>
-            FreshIdentifier(field.id.name + "_").setType(field.getType) 
-            // TODO: WHY DOES VARDECL OVERRIDE GETTYPE? :'(
-          }
+      val funsValsMap = (extraFuns.flatten zip assignedToVals.flatten).toMap 
+
+      // Take an expression and isolate the case relevant for this constructor function
+      // funArg is the argument of the original function
+      // args are the arguments of the constructor function
+
+      // FIXME: Does not work for TuplePatterns
+      def isolateRelevantCases(funArg : Identifier, args:Seq[Identifier])(expr : Expr) : Option[Expr] = {
+
+        // Relevant patterns are: 
+        // Wildcard
+        // CaseClassPattern with classDef
+        // instanceOf with supertype of classDef
+        def isRelevantPattern(pat: Pattern) : Boolean = pat match { 
+          case WildcardPattern(binder)    => true
+          case CaseClassPattern(_, cc, _) => cc == classDef
+          case InstanceOfPattern(_, cc : CaseClassDef) => cc == classDef
+          case InstanceOfPattern(_, ab : AbstractClassDef) => 
+            ab.knownDescendents contains classDef
+          case tp@TuplePattern(_,_) => 
+            ctx.reporter.fatalError("TuplePatterns not supported yet!\n" + tp.toString) //FIXME
         }
 
-        val funsValsMap = (extraFuns.flatten zip assignedToVals.flatten).toMap 
 
-        // Take an expression and isolate the case relevant for this constructor function
-        // funArg is the argument of the original function
-        // args are the arguments of the constructor function
-
-        // FIXME: Does not work for TuplePatterns
-        def isolateRelevantCases(funArg : Identifier, args:Seq[Identifier])(expr : Expr) : Option[Expr] = expr match {
+        expr match {
           case me@MatchExpr(Variable(id),cases) if (funArg == id) => { 
-        
-            // Relevant patterns are: 
-            // Wildcard
-            // CaseClassPattern with classDef
-            // instanceOf with supertype of classDef
-            def hasRelevantPattern(mc : MatchCase) : Boolean = mc.pattern match { 
-              case WildcardPattern(binder)    => true
-              case CaseClassPattern(_, cc, _) => cc == classDef
-              case InstanceOfPattern(_, cc : CaseClassDef) => cc == classDef
-              case InstanceOfPattern(_, ab : AbstractClassDef) => 
-                ab.knownDescendents contains classDef
-              case tp@TuplePattern(_,_) => 
-                ctx.reporter.fatalError("TuplePatterns not supported yet!\n" + tp.toString) //FIXME
-            } 
-          
-            val relCases = cases filter hasRelevantPattern 
+            val relCases = cases filter { mc => isRelevantPattern(mc.pattern) }
             // We will treat types with 0 fields separately
             if (args.size == 0){
               // Nothing to pattern match against, all patterns succeed. 
@@ -304,7 +305,7 @@ object MemoizationPhase extends TransformationPhase {
               //      (which will then be "catch-all")
               val relCases2 = relCases takeWhile { cas => 
                 cas.pattern.isInstanceOf[CaseClassPattern] || cas.hasGuard
-              }           
+              }
               val relevantCases = {
                 if      (relCases.length == 1) relCases // One case
                 else if (relCases.length == relCases2.length) relCases2 // All are CaseClassPatterns
@@ -349,15 +350,14 @@ object MemoizationPhase extends TransformationPhase {
                 // The matched against expression will be a tuple with the fields of funArg
                 def reconstructCase(mc: MatchCase, funArg : Identifier) : MatchCase = {
                   val newPattern = mc.pattern match {
+                    // This always succeeds at this point
                     case InstanceOfPattern(binder, _) => WildcardPattern(binder)
                     case WildcardPattern  (binder)    => WildcardPattern(binder)
                     case CaseClassPattern(_, _, subPatterns) =>
                       // (Subpatterns should not be empty here)
                       TuplePattern(None, subPatterns)
-                    case tp@TuplePattern(_, _)  => ctx.reporter.fatalError( //FIXME
-                      "TuplePatterns not supported yet!\n" +
-                      tp.toString
-                    )
+                    case tp@TuplePattern(_, _)  => //FIXME
+                      ctx.reporter.fatalError("TuplePatterns not supported yet!\n" + tp.toString)
                   }
 
                   val newMc = mc match {
@@ -378,17 +378,20 @@ object MemoizationPhase extends TransformationPhase {
                   }
                 }
             
-                val newScrut = Tuple(args map Variable)//{ arg => Variable(arg.id) })
-                Some( MatchExpr(newScrut, relevantCases map {reconstructCase(_,funArg) } ))//{unfoldCase(_, args)}) )// FIXME: this works for CaseClassPatterns only
+                val newScrut = Tuple(args map Variable)
+                Some( MatchExpr(newScrut, relevantCases map {reconstructCase(_,funArg) } ))
               }
-
             }
 
           }
-          
-          case MatchExpr(tp@Tuple(_), _ ) if (variablesOf(tp) contains funArg) =>
+
+        
+        
+          case MatchExpr(tp@Tuple(_), _ ) if (variablesOf(tp) contains funArg) => {
             ctx.reporter.fatalError("TuplePatterns not supported yet:\n" + tp.toString) //FIXME
-          
+          }
+
+
           case FunctionInvocation(funDef, args_) if (args_ contains Variable(funArg)) => {
             if (extraFuns exists (_ contains funDef)) { //FIXME slow
               funsValsMap get funDef map Variable
@@ -398,19 +401,18 @@ object MemoizationPhase extends TransformationPhase {
               val isolatedBody = 
                 // Recurse manually because arguments of isolateRelevantCases are different
                 searchAndReplace(isolateRelevantCases(funDef.args.head.id,args))(funDef.body.get) 
-              // Let value is isolated funbody, but replace typical parameters with actual
-              val letValue = replaceFromIDs( 
+              // replace typical parameters with actual
+              Some( replaceFromIDs( 
                 ( funDef.args.map{ _.id } zip args.map(Variable) ).toMap,
                 isolatedBody 
-              )
-              Some(letValue)
+              ))
             }
           }
 
           case CaseClassInstanceOf(cc, expr) if (expr == Variable(funArg)) =>
             // TODO: Why only caseclass?
             Some(BooleanLiteral(cc == classDef)) 
-          
+        
           // If we are trying to get a field of funDef, 
           // we can just get the function argument in the same position
           case CaseClassSelector(cc, expr, id) if (expr == Variable(funArg)) =>
@@ -426,65 +428,67 @@ object MemoizationPhase extends TransformationPhase {
 
           case Variable(id) if (id == funArg) => {
             // This indicates failure to remove this instance of funDef early...
-            ctx.reporter.fatalError("Failed not remove instance of variable " + id.name +
-              ".\nFailing..."
+            ctx.reporter.fatalError("Failed to remove instance of variable " + id.name +
+              "while creating constructor function for class " + classDef.id.name
             )
           }
 
           case _ => None 
         }
-        
-        // The expressions to be assigned to the new vals
-        val assignedExprs : List[List[Expr]] = extraFuns map { 
-          _ map { fun =>
-            searchAndReplace(isolateRelevantCases(fun.args.head.id,args))(fun.body.get) 
+      }
+      
+      // The expressions to be assigned to the new vals
+      val assignedExprs : List[List[Expr]] = extraFuns map { 
+        _ map { fun =>
+          searchAndReplace(isolateRelevantCases(fun.args.head.id,args))(fun.body.get) 
+        }
+      }
+
+      // The expressions which will initialize the extra fields 
+      val fieldInitializers : List[Expr] = (extraCaseClasses zip assignedToVals) map {
+        case (cc, ids) => CaseClass(cc, ids map Variable)
+      }
+       
+      // The final return value of the function
+      val returnValue : Expr = CaseClass(
+        classDef, 
+        (args map Variable) ++ fieldInitializers 
+      )
+
+      // Reorder value assignments to be in the correct dependency order
+      val assignments = ( assignedToVals.flatten zip assignedExprs.flatten ) sortWith {
+        case ( (val1,expr1), (val2,expr2) ) => {
+          if      (!variablesOf(expr1).contains(val2)) true  // val2 not found in expr1
+          else if (!variablesOf(expr2).contains(val1)) false // val1 not found in expr2
+          else {
+            // Circular dependency with the same argument is an infinite loop
+            ctx.reporter.error("Functions " + 
+              val1.name.take(val1.name.length-1) + " and " +
+              val2.name.take(val2.name.length-1) +
+              " call each other recursively with the same argument!"
+            )
+            true
           }
         }
-
-        // The expressions which will initialize the extra fields 
-        val fieldInitializers : List[Expr] = (extraCaseClasses zip assignedToVals) map {
-          case (cc, ids) => CaseClass(cc, ids map Variable)
-        }
-         
-        // The final return value of the function
-        val returnValue : Expr = CaseClass(
-          classDef, 
-          (args map Variable) ++ fieldInitializers 
-        )
-
-        // Reorder value assignments to be in the correct dependency order
-        val assignments = ( assignedToVals.flatten zip assignedExprs.flatten ) sortWith {
-          case ( (val1,expr1), (val2,expr2) ) => 
-            if      (!variablesOf(expr1).contains(val2)) true  // val2 not found in expr1
-            else if (!variablesOf(expr2).contains(val1)) false // val1 not found in expr2
-            else {
-              // Circular dependency with the same argument is an infinite loop
-              ctx.reporter.error("Functions " + 
-                val1.name.take(val1.name.length-1) + " and " +
-                val2.name.take(val2.name.length-1) +
-                " call each other recursively with the same argument!"
-              )
-              true
-            }
-        }
-            
-
-        // Function to fold over all assignments to create body
-        def makeLetDef( idValue : (Identifier, Expr) , bd : Expr) = Let(idValue._1, idValue._2, bd)  
-
-        val body = assignments.  :\ (returnValue)(makeLetDef)
-
-        val res = new FunDef(
-          FreshIdentifier("create" + classDef.id.name),
-          classType,
-          args map { arg => new VarDecl(arg, arg.getType) }
-        )
-        
-        res. body = Some(body)
-        Some(res)
-
       }
+          
+
+      // Function to fold over all assignments to create body
+      def makeLetDef( idValue : (Identifier, Expr) , bd : Expr) = Let(idValue._1, idValue._2, bd)  
+
+      val body = assignments.  :\ (returnValue)(makeLetDef)
+
+      val res = new FunDef(
+        FreshIdentifier("create" + classDef.id.name),
+        classType,
+        args map { arg => new VarDecl(arg, arg.getType) }
+      )
+      
+      res. body = Some(body)
+      Some(res)
     }
+
+
   }
   
 

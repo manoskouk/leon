@@ -805,7 +805,7 @@ trait AbstractZ3Solver
           }
         }
       }
-      case Z3NumeralIntAST(Some(v)) => IntLiteral(v)
+      case Z3NumeralAST(Some(v)) => IntLiteral(v)
       case _ => throw e
     }
 

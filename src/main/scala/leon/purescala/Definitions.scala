@@ -101,6 +101,9 @@ object Definitions {
     val tparams: Seq[TypeParameterDef]
     def fields: Seq[ValDef]
     val parent: Option[AbstractClassType]
+    def setParent(parent: AbstractClassDef) : self.type // FIXME this prob. won't work
+    def hierarchyRoot : ClassTypeDef = 
+      if (!hasParent) this else parent.get.hierarchyRoot 
 
     def hasParent = parent.isDefined
 

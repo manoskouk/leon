@@ -729,8 +729,8 @@ trait AbstractZ3Solver
             }
           }
 
-          case Z3NumeralIntAST(Some(v)) => IntLiteral(v)
-          case Z3NumeralIntAST(None) => {
+          case Z3NumeralAST(Some(v)) => IntLiteral(v)
+          case Z3NumeralAST(None) => {
             reporter.info("Cannot read exact model from Z3: Integer does not fit in machine word")
             reporter.info("Exiting procedure now")
             sys.exit(0)
@@ -775,7 +775,7 @@ trait AbstractZ3Solver
           }
         }
       }
-      case Z3NumeralIntAST(Some(v)) => IntLiteral(v)
+      case Z3NumeralAST(Some(v)) => IntLiteral(v)
       case _ => throw e
     }
 

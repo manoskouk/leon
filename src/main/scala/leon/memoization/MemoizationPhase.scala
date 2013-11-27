@@ -31,7 +31,13 @@ object MemoizationPhase extends TransformationPhase {
       p.transitivelyCalls(f,f) &&
       f.args.size == 1 &&
       f.args.head.getType.isInstanceOf[ClassType] &&
-      f.args.head.getType.asInstanceOf[ClassType].classDef == classDef
+      f.args.head.getType.asInstanceOf[ClassType].classDef == classDef &&
+      (
+        if (f.returnType.isInstanceOf[ClassType]) { 
+          f.returnType.asInstanceOf[ClassType].classDef.hierarchyRoot != classDef.hierarchyRoot 
+        }
+        else true 
+      )  // TODO : clear out what happens in these cases. 
     } 
     val hasLocalMemoFuns = !classDefRecursiveFuns.isEmpty
     
@@ -416,7 +422,8 @@ object MemoizationPhase extends TransformationPhase {
           // If we are trying to get a field of funDef, 
           // we can just get the function argument in the same position
           case CaseClassSelector(cc, expr, id) if (expr == Variable(funArg)) =>
-            Some( Variable(args(cc.fields.indexWhere(_.id == id))) )
+            //Some( Variable(args(cc.fields.indexWhere(_.id == id))) )
+            Some( Variable(args(cc.selectorID2Index(id)))) 
 
           // FIXME: Generally, we need to catch all expressions mentioning funArg
           //        Is there anything else to consider?
@@ -456,10 +463,49 @@ object MemoizationPhase extends TransformationPhase {
       )
 
       // Reorder value assignments to be in the correct dependency order
+      // Found this here: https://gist.github.com/ThiporKong/4399695
+      def topoSort[A](toPreds: Map[A,Set[A]]) : List[A] = {
+        def tSort(toPreds: Map[A, Set[A]], done: List[A]): List[A] = {
+          val (noPreds, hasPreds) = toPreds.partition { _._2.isEmpty }
+          if (noPreds.isEmpty) {
+            if (hasPreds.isEmpty) done else throw new IllegalArgumentException(
+              "Functions:\n" ++ (noPreds mkString "\n" ) ++ "\nare involved in circular definition!" 
+            )
+          } 
+          else {
+            val found : List[A] = noPreds.map { _._1 }.toList
+            tSort(hasPreds.mapValues { _ -- found }, found ++ done)    
+          }
+        }
+        tSort(toPreds, List()).reverse
+      }
+      val valsWithExprs : List[(Identifier, Expr)] = assignedToVals.flatten zip assignedExprs.flatten
+      val edges : Map[(Identifier,Expr),Set[(Identifier,Expr)]] = ( 
+        valsWithExprs map { case (vl1, expr1) =>
+          (vl1, expr1) -> (valsWithExprs collect { 
+            case (vl2, expr2) if (variablesOf(expr1) contains vl2) => (vl2,expr2)
+          }).toSet 
+        }
+      ).toMap
+      val assignments: List[(Identifier, Expr)] = try {
+        topoSort(edges)
+      } 
+      catch {
+        case ex: IllegalArgumentException => 
+          ctx.reporter.error(ex.getMessage())
+          valsWithExprs
+      }
+      /*
       val assignments = ( assignedToVals.flatten zip assignedExprs.flatten ) sortWith {
         case ( (val1,expr1), (val2,expr2) ) => {
-          if      (!variablesOf(expr1).contains(val2)) true  // val2 not found in expr1
-          else if (!variablesOf(expr2).contains(val1)) false // val1 not found in expr2
+          if (!variablesOf(expr1).contains(val2)) {
+            dbg(val1.toString + " does not depend on " + val2.toString)
+            true // val2 not found in expr1
+          }
+          else if (!variablesOf(expr2).contains(val1)) {
+            dbg(val2.toString + " does not depend on " + val1.toString)
+            false // val1 not found in expr2
+          }
           else {
             // Circular dependency with the same argument is an infinite loop
             ctx.reporter.error("Functions " + 
@@ -471,7 +517,7 @@ object MemoizationPhase extends TransformationPhase {
           }
         }
       }
-          
+        */  
 
       // Function to fold over all assignments to create body
       def makeLetDef( idValue : (Identifier, Expr) , bd : Expr) = Let(idValue._1, idValue._2, bd)  
@@ -660,8 +706,11 @@ object MemoizationPhase extends TransformationPhase {
       map replOnFunDef(replaceConstructors(constructorMap))
     )
     
-    val newConstructors = defTrees flatMap { _.newConstructors } map 
-      replOnFunDef(replaceFunsAndPatternMatching(memoFunsMap))
+    // Constructors get a special treatment, to not replace themselves into their own body
+    val newConstructors = ( defTrees flatMap { _.newConstructors } 
+      map replOnFunDef(replaceFunsAndPatternMatching(memoFunsMap))
+      map { con => replOnFunDef(replaceConstructors(constructorMap - con.returnType.asInstanceOf[CaseClassType].classDef))(con) }
+    )
 
     // Make a new program containing the above definitions. 
     val progName = FreshIdentifier(p.mainObject.id.name + "Expanded")

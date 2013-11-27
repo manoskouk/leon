@@ -178,6 +178,8 @@ object Definitions {
     def parent: Option[AbstractClassDef]
     def setParent(parent: AbstractClassDef) : self.type
     def hasParent: Boolean = parent.isDefined
+    def hierarchyRoot : ClassTypeDef = 
+      if (!hasParent) this else parent.get.hierarchyRoot 
     val isAbstract: Boolean
 
   }

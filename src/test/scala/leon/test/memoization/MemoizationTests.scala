@@ -7,7 +7,6 @@ import leon._
 import leon.purescala.Definitions._
 import leon.purescala.Trees._
 import leon.purescala.TreeOps._
-import leon.plugin._
 import memoization._
 
 /*import leon.solvers.z3._
@@ -27,10 +26,10 @@ class MemoizationSuite extends LeonTestSuite {
 
     for(f <- fs) {
       block(f)
-    }
+    } 
   }
 
-  val pipeline = plugin.ExtractionPhase andThen utils.SubtypingPhase andThen MemoizationPhase
+  val pipeline = frontends.scalac.ExtractionPhase andThen utils.SubtypingPhase andThen MemoizationPhase
   val inputFilePath = "regression/memoization/original"
   val outputFilePath = "regression/memoization/memoOut"
   

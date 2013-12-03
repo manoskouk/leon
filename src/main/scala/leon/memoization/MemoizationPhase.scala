@@ -1,5 +1,5 @@
 package leon
-package Memoization
+package memoization
 
 import leon._
 import leon.utils._
@@ -647,7 +647,7 @@ object MemoizationPhase extends TransformationPhase {
 
 
 
-  def apply (ctx: LeonContext, p: Program) = {
+  def apply (ctx: LeonContext, p : Program) = {
 
     this.ctx = ctx
     ctx.reporter.info("Applying memoization transformation on object " + p.mainObject.id.name)

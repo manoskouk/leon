@@ -17,7 +17,8 @@ object Main {
       xlang.XlangAnalysisPhase,
       synthesis.SynthesisPhase,
       termination.TerminationPhase,
-      verification.AnalysisPhase
+      verification.AnalysisPhase,
+      memoization.MemoizationPhase
     )
   }
 
@@ -203,7 +204,7 @@ object Main {
       } else if (settings.xlang) {
         xlang.XlangAnalysisPhase
       } else if (settings.memo != "") {
-        Memoization.MemoizationPhase
+        memoization.MemoizationPhase
       } else if (settings.verify) {
         verification.AnalysisPhase
       } else {

@@ -415,13 +415,13 @@ object MemoizationPhase extends TransformationPhase {
             }
           }
 
-          case CaseClassInstanceOf(cc, expr) if (expr == Variable(funArg)) =>
+          case CaseClassInstanceOf(cc, Variable(vr)) if (vr == funArg) =>
             // TODO: Why only caseclass?
             Some(BooleanLiteral(cc == classDef)) 
         
           // If we are trying to get a field of funDef, 
           // we can just get the function argument in the same position
-          case CaseClassSelector(cc, expr, id) if (expr == Variable(funArg)) =>
+          case CaseClassSelector(cc, Variable(vr), id) if (vr == funArg) =>
             //Some( Variable(args(cc.fields.indexWhere(_.id == id))) )
             Some( Variable(args(cc.selectorID2Index(id)))) 
 
@@ -491,34 +491,13 @@ object MemoizationPhase extends TransformationPhase {
         topoSort(edges)
       } 
       catch {
+        // If the definitions have cycles, we output a program that won't compile
+        // (but the original program looped anyway)
         case ex: IllegalArgumentException => 
           ctx.reporter.error(ex.getMessage())
           valsWithExprs
       }
-      /*
-      val assignments = ( assignedToVals.flatten zip assignedExprs.flatten ) sortWith {
-        case ( (val1,expr1), (val2,expr2) ) => {
-          if (!variablesOf(expr1).contains(val2)) {
-            dbg(val1.toString + " does not depend on " + val2.toString)
-            true // val2 not found in expr1
-          }
-          else if (!variablesOf(expr2).contains(val1)) {
-            dbg(val2.toString + " does not depend on " + val1.toString)
-            false // val1 not found in expr2
-          }
-          else {
-            // Circular dependency with the same argument is an infinite loop
-            ctx.reporter.error("Functions " + 
-              val1.name.take(val1.name.length-1) + " and " +
-              val2.name.take(val2.name.length-1) +
-              " call each other recursively with the same argument!"
-            )
-            true
-          }
-        }
-      }
-        */  
-
+       
       // Function to fold over all assignments to create body
       def makeLetDef( idValue : (Identifier, Expr) , bd : Expr) = Let(idValue._1, idValue._2, bd)  
 
@@ -627,14 +606,15 @@ object MemoizationPhase extends TransformationPhase {
       // Give a pattern an extra wildcard in the end, if needed (recursive)
       def fixPattern(p: Pattern) : Pattern = p match {
         case CaseClassPattern(binder,caseClassDef, subPatterns) =>
-          // Side effects should ensure result of renewing type are visible here
-          if (caseClassDef.fields.length == subPatterns.length) p
-          else 
-            CaseClassPattern(
-              binder, 
-              caseClassDef, 
-              (subPatterns map fixPattern) :+ WildcardPattern(None)
-            )
+          // Side effects should ensure result of renewing type are visible here,
+          // so add one wildcard for each additional field 
+          val newSubPatterns = (subPatterns map fixPattern) ++
+            Seq.fill(caseClassDef.fields.length - subPatterns.length){ WildcardPattern(None) }
+          CaseClassPattern(
+            binder, 
+            caseClassDef, 
+            newSubPatterns
+          )
         case TuplePattern(binder, subPatterns) => {
           if (subPatterns.length == 0) sys.error("TUPLE WITH 0 ARGS!!!")
           TuplePattern(binder, subPatterns map fixPattern)

@@ -135,4 +135,17 @@ trait LeonTestSuite extends FunSuite with Timeouts {
 
     asFile.listFiles().filter(f => filter(f.getPath()))
   }
+  
+  def resourceDir(dir : String) : File = {
+    import scala.collection.JavaConversions._
+
+    val d = this.getClass.getClassLoader.getResource(dir)
+
+    if(d == null || d.getProtocol != "file") {
+      assert(false, "Tests have to be run from within `sbt`, for otherwise the test files will be harder to access (and we dislike that).")
+    }
+
+    new File(d.toURI())
+  }
+
 }

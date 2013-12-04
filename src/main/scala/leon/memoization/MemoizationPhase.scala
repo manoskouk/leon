@@ -647,11 +647,16 @@ object MemoizationPhase extends TransformationPhase {
 
 
 
-  def apply (ctx: LeonContext, p : Program) = {
+  def apply (ctx: LeonContext, originalP : Program) = {
+
 
     this.ctx = ctx
-    ctx.reporter.info("Applying memoization transformation on object " + p.mainObject.id.name)
+    ctx.reporter.info("Applying memoization transformation on object " + originalP.mainObject.id.name)
       
+    // Duplicate the original program to keep the old tree too
+    val p = originalP.duplicate
+
+
     val defTrees = p.classHierarchyRoots.toList map { cd => MemoClassRecord(p, cd) }  
     
     // Map of (oldFun -> newFun). Will contain only funs that are memoized

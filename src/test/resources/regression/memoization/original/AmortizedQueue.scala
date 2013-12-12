@@ -208,4 +208,20 @@ object AmortizedQueue {
     } else
       true
   } holds
+
+  def emptyQueue() : AbsQueue = Queue(Nil(), Nil())
+  // pseudorandom els. to insert
+  def psr (input : Int) : Int = {
+    (input * 476272 + 938709) % 187987
+  }
+  def rec(size : Int, acc : AbsQueue) : AbsQueue = {
+    if (size == 0) acc
+    else rec(size -1, enqueue(acc, psr(size)))
+  }
+  
+  def test(size : Int) : AbsQueue = { 
+      rec(size, emptyQueue)
+  }
+
+
 }

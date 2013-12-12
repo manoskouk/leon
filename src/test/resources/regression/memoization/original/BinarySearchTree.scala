@@ -1,4 +1,4 @@
-object BSTSimpler {
+object BinarySearchTree {
   sealed abstract class Tree
   case class Node(left: Tree, value: Int, right: Tree) extends Tree
   case class Leaf() extends Tree
@@ -83,5 +83,20 @@ object BSTSimpler {
     case Leaf() => Set.empty[Int]
     case Node(l, v, r) => content(l) ++ Set(v) ++ content(r)
   }
+  
+
+  def psr (input : Int) : Int = {
+    (input * 476272 + 938709) % 187987
+  }
+  def rec(size : Int, acc : Tree) : Tree = {
+    if (size == 0) acc
+    else rec(size -1, insert(acc, psr(size)))
+  }
+  
+  def test(size : Int) : Tree = { 
+      rec(size, Leaf())
+  }
+
+
 }
 

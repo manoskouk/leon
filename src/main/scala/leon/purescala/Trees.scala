@@ -409,7 +409,7 @@ object Trees {
 
   case class CaseClassInstanceOf(classDef: CaseClassDef, expr: Expr) extends Expr with FixedType {
     val fixedType = BooleanType
-  }
+  } // FIXME why only case class?
 
   object CaseClassSelector {
     def apply(classDef: CaseClassDef, caseClass: Expr, selector: Identifier): Expr = {

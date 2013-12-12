@@ -51,7 +51,9 @@ object MemoizationPhase extends TransformationPhase {
       else Some ({
         val concr = new CaseClassDef(id = FreshIdentifier(classDef.id + "Fields") )
         concr.setParent(extraFieldAbstr.get)
-        concr.fields = classDefRecursiveFuns map { fn => new VarDecl(fn.id.freshen, fn.returnType) } 
+        concr.fields = classDefRecursiveFuns map { fn => 
+          new VarDecl(fn.id.freshen, fn.returnType) 
+        } 
         concr
       })
     }
@@ -121,7 +123,7 @@ object MemoizationPhase extends TransformationPhase {
       val newArg = new VarDecl(FreshIdentifier(oldArg.name), classType )
       val newFun = new FunDef(
         id = FreshIdentifier(fn.id.name),
-        returnType = fn.returnType, // FIXME!!! need to search for the new type corresponding to the old one
+        returnType = fn.returnType, // This is correct only with side-effects
         args = List(newArg)
       )
       // The object whose field we select is an application of fieldExtractor on newArg
@@ -599,7 +601,8 @@ object MemoizationPhase extends TransformationPhase {
     case FunctionInvocation(funDef,args) => 
       memoFunsMap get funDef match {
         case None        => None
-        case Some(newFn) => Some(FunctionInvocation(newFn,args))
+        case Some(newFn) => 
+          Some(FunctionInvocation(newFn,args))
       }
     
     case me : MatchExpr => 
@@ -664,6 +667,7 @@ object MemoizationPhase extends TransformationPhase {
       rec => rec.classDefRecursiveFuns zip rec.memoizedFuns
     )}.flatten.toMap
     
+
     // The non-memoized functions 
     val nonMemoFuns = p.definedFunctions filter { fn => 
       ( memoFunsMap get fn).isEmpty

@@ -65,11 +65,25 @@ object InsertionSort {
     case Nil() => Nil()
     case Cons(x,xs) => sortedIns(x, sort(xs))
   }) ensuring(res => contents(res) == contents(l) && isSorted(res))
-
+/*
   def main(args: Array[String]): Unit = {
     val ls: List = Cons(5, Cons(2, Cons(4, Cons(5, Cons(1, Cons(8,Nil()))))))
 
     println(ls)
     println(sort(ls))
   }
+*/
+  def psr (input : Int) : Int = {
+    (input * 476272 + 938709) % 187987
+  }
+  def rec(size : Int, acc : List) : List = {
+    if (size == 0) acc
+    else rec(size -1, Cons(psr(size), acc))
+  }
+  
+  def test(size : Int) : List = { 
+      val l = rec(size, Nil())
+      sort(l)
+  }
+
 }

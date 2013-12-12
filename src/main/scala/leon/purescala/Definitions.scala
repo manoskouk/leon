@@ -21,6 +21,7 @@ object Definitions {
   }
 
   /** A VarDecl declares a new identifier to be of a certain type. */
+  // TODO VARDECL has a serious inconsistency when getting type
   case class VarDecl(id: Identifier, tpe: TypeTree) extends Definition with Typed {
     self: Serializable =>
 

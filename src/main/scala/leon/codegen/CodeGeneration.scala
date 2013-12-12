@@ -58,6 +58,7 @@ object CodeGeneration {
   // Assumes the CodeHandler has never received any bytecode.
   // Generates method body, and freezes the handler at the end.
   def compileFunDef(funDef : FunDef, ch : CodeHandler)(implicit env : CompilationEnvironment) {
+    //println("CodeGen: processing function " + funDef.id)
     val newMapping = if (env.params.requireMonitor) {
         funDef.args.map(_.id).zipWithIndex.toMap.mapValues(_ + 1)
       } else {
@@ -275,6 +276,7 @@ object CodeGeneration {
         ch << Label(al)
 
       case FunctionInvocation(fd, as) =>
+        //println("CodeGen: searching for " + fd.id.uniqueName)
         val (cn, mn, ms) = env.funDefToMethod(fd).getOrElse {
           throw CompilationException("Unknown method : " + fd.id)
         }
@@ -694,7 +696,8 @@ object CodeGeneration {
           ech << ALoad(castSlot)
           instrumentedGetField(ech, ccd, vd.id)
 
-          typeToJVM(vd.id.getType) match {
+          //typeToJVM(vd.id.getType) match {
+          typeToJVM(vd.getType) match {
             case "I" | "Z" =>
               ech << If_ICmpNe(notEq)
 

@@ -67,6 +67,7 @@ object CompilationEnvironment {
       }
 
     val fMap : Map[FunDef,(String,String,String)] = (fs.map { fd =>
+      //println("Env: found function " + fd.id.uniqueName)
       val sig = "(" + monitorType + fd.args.map(a => typeToJVM(a.tpe)).mkString("") + ")" + typeToJVM(fd.returnType)
 
       fd -> (className, fd.id.uniqueName, sig)

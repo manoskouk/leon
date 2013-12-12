@@ -73,9 +73,9 @@ class ScalaPrinter(sb: StringBuffer = new StringBuffer) extends PrettyPrinter(sb
 
       case Let(b,d,e) =>
         optBraces { implicit lvl =>
-          sb.append("val " + b + " = ")
+          sb.append("val " + b + " = { ")
           pp(d, p)
-          sb.append("\n")
+          sb.append("}\n")
           ind
           pp(e, p)
           sb.append("\n")
@@ -139,7 +139,7 @@ class ScalaPrinter(sb: StringBuffer = new StringBuffer) extends PrettyPrinter(sb
       case GreaterThan(l,r)     => optParentheses { ppBinary(l, r, " > ") }
       case LessEquals(l,r)      => optParentheses { ppBinary(l, r, " <= ") }
       case GreaterEquals(l,r)   => optParentheses { ppBinary(l, r, " >= ") }
-      case fs @ FiniteSet(rs)        =>
+      case fs @ FiniteSet(rs)   =>
         if (rs.isEmpty) {
           fs.getType match {
             case SetType(b) =>
@@ -165,15 +165,37 @@ class ScalaPrinter(sb: StringBuffer = new StringBuffer) extends PrettyPrinter(sb
         pp(s, p)
         sb.append(".max")
       case SetCardinality(t) => ppUnary(t, "", ".size")
-      case FiniteMap(rs) =>
-        sb.append("{")
-        val sz = rs.size
-        var c = 0
-        rs.foreach{case (k, v) => {
-          pp(k, p); sb.append(" -> "); pp(v, p); c += 1 ; if(c < sz) sb.append(", ")
-        }}
-        sb.append("}")
-
+      case SubsetOf(set1, set2) => 
+      case fm@FiniteMap(rs) =>
+        if (rs.isEmpty) {
+          fm.getType match {
+            case MapType(from,to) =>
+              sb.append("Map[")
+              pp(from, p)
+              sb.append(",")
+              pp(to,p)
+              sb.append("]()")
+            case _ =>
+              sb.append("Map()")
+          }
+        } else {
+          sb.append("Map({")
+          val sz = rs.size
+          var c = 0
+          rs.foreach{case (k, v) => {
+            pp(k, p); sb.append(" -> "); pp(v, p); c += 1 ; if(c < sz) sb.append("}, {")
+          }}
+          sb.append("})")
+        }
+      case MapUnion(map1,FiniteMap(rs)) => {
+        pp(map1, p)
+        rs foreach { case (key, el) => 
+          sb.append(".updated(") 
+          ppBinary(key, el, ",") 
+          sb.append(")") 
+        }
+      } // FIXME: general case
+      //case MapDifference(map1, map2) => optParentheses { ppBinary(map1, map2, " -- ") }
       case MapGet(m,k) =>
         pp(m, p)
         ppNary(Seq(k), "(", ",", ")")
@@ -403,7 +425,7 @@ class ScalaPrinter(sb: StringBuffer = new StringBuffer) extends PrettyPrinter(sb
     case (_: And) => 3
     case (_: GreaterThan | _: GreaterEquals  | _: LessEquals | _: LessThan) => 4
     case (_: Equals | _: Iff | _: Not) => 5
-    case (_: Plus | _: Minus | _: SetUnion| _: SetDifference) => 6
+    case (_: Plus | _: Minus | _:SetUnion | _:SetDifference ) => 6
     case (_: Times | _: Division | _: Modulo) => 7
     case _ => 7
   }
@@ -413,7 +435,7 @@ class ScalaPrinter(sb: StringBuffer = new StringBuffer) extends PrettyPrinter(sb
     case (_, Some(_: Definition)) => false
     case (_, Some(_: MatchExpr | _: MatchCase | _: Let | _: LetTuple | _: LetDef | _: IfExpr)) => false
     case (_, Some(_: FunctionInvocation)) => false
-    case (ie: IfExpr, _) => true
+    case (_: IfExpr | _: MatchExpr, _) => true
     case (e1: Expr, Some(e2: Expr)) if precedence(e1) > precedence(e2) => false
     case (_, _) => true
   }

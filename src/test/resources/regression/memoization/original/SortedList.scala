@@ -12,20 +12,24 @@ object SortedList {
       case Nil() => 0
       case Cons(_, t) => 1 + size(t)
   }) ensuring(res => res >= 0)
-
+/*
   def content(l: List): Set[Int] = l match {
     case Nil() => Set()
     case Cons(i, t) => Set(i) ++ content(t)
   }
-
+*/
   def insert1(l: List, v: Int) = (
     Cons(v, l)
-  ) ensuring(res => content(res) == content(l) ++ Set(v) && size(res) >= size(l))
+  ) ensuring(res =>// content(res) == content(l) ++ Set(v) && 
+    size(res) >= size(l)
+  )
 
   def insert2(l: List, v: Int): List = (l match {
     case Nil() => Cons(v, Nil())
     case Cons(x, tail) => if (x == v) l else Cons(x, insert2(tail, v))
-  }) ensuring(res => content(res) == content(l) ++ Set(v) && size(res) >= size(l))
+  }) ensuring(res => // content(res) == content(l) ++ Set(v) && 
+    size(res) >= size(l)
+  )
 
   def insert3(l: List, v: Int): List = {
     require(isStrictlySorted(l))
@@ -41,12 +45,16 @@ object SortedList {
           Cons(x, insert3(tail, v))
         }
     }
-  } ensuring(res => content(res) == content(l) ++ Set(v) && size(res) >= size(l))
+  } ensuring(res => //content(res) == content(l) ++ Set(v) && 
+    size(res) >= size(l)
+  )
 
   def delete1(l: List, v: Int): List = (l match {
       case Nil() => Nil()
       case Cons(x, tail) => if (x == v) delete1(tail, v) else Cons(x, delete1(tail, v))
-    }) ensuring(res => !(content(res) contains v) && size(res) <= size(l))
+    }) ensuring(res => // !(content(res) contains v) && 
+      size(res) <= size(l)
+    )
 
   //def delete2(l: List, v: Int): List = {
   //  require(isStrictlySorted(l))
@@ -65,14 +73,14 @@ object SortedList {
   def contains(list : List, elem : Int) : Boolean = (list match {
     case Nil() => false
     case Cons(x, xs) => if(elem == x) true else contains(xs, elem)
-  }) ensuring(res => res == content(list).contains(elem))
+  }) //ensuring(res => res == content(list).contains(elem))
 
   def deleteMagic(head: Int, tail: List, toDelete: Int): List = ({
     //require(isStrictlySorted(Cons(head, tail)) && toDelete < head);
     require(isStrictlySorted(Cons(toDelete, Cons(head, tail))))
 
     Cons(head, tail)
-  })ensuring(res => !(content(res) contains toDelete))
+  })//ensuring(res => !(content(res) contains toDelete))
 
   def delete3(l: List, v: Int): List = {
     require(isStrictlySorted(l))
@@ -88,7 +96,9 @@ object SortedList {
           Cons(x, delete3(tail, v))
         }
     }
-  } ensuring(res => !(content(res) contains v) && size(res) <= size(l))
+  } ensuring(res => //!(content(res) contains v) && 
+    size(res) <= size(l)
+  )
 
   @induct
   def isStrictlySorted(l: List): Boolean = (l match {
@@ -124,4 +134,19 @@ object SortedList {
     case Cons(x, Nil()) => true
     case Cons(x, xs@Cons(y, ys)) => x <= y && isSorted(xs)
   }
+
+  
+  def psr (input : Int) : Int = {
+    (input * 476272 + 938709) % 187987
+  }
+  def rec(size : Int, acc : List) : List = {
+    if (size == 0) acc
+    else rec(size -1, insert1(acc, psr(size)))
+  }
+  
+  def test(size : Int) : List = { 
+      rec(size, Nil())
+  }
+
+
 }

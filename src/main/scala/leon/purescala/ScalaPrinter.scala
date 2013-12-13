@@ -52,6 +52,11 @@ class ScalaPrinter(opts: PrinterOptions, sb: StringBuffer = new StringBuffer) ex
     }
 
     var printPos = opts.printPositions
+    
+    def isSimple(e : Expr) = e match {
+      case _:LetDef | _:Let | _:LetTuple => false 
+      case _ => true
+    }
 
     tree match {
       case LetTuple(ids,d,e) =>
@@ -66,7 +71,9 @@ class ScalaPrinter(opts: PrinterOptions, sb: StringBuffer = new StringBuffer) ex
               }
           }
           sb.append(") = ")
+          if (!isSimple(d)) sb.append("{ ")
           pp(d, p)
+          if (!isSimple(d)) sb.append("}")
           sb.append("\n")
           ind
           pp(e, p)
@@ -75,9 +82,11 @@ class ScalaPrinter(opts: PrinterOptions, sb: StringBuffer = new StringBuffer) ex
 
       case Let(b,d,e) =>
         optBraces { implicit lvl =>
-          sb.append("val " + b + " = { ")
+          sb.append("val " + b + " = ")
+          if (!isSimple(d)) sb.append("{ ")
           pp(d, p)
-          sb.append("}\n")
+          if (!isSimple(d)) sb.append("}")
+          sb.append("\n")
           ind
           pp(e, p)
           sb.append("\n")

@@ -50,6 +50,11 @@ class ScalaPrinter(sb: StringBuffer = new StringBuffer) extends PrettyPrinter(sb
       }
     }
 
+    def isSimple(e : Expr) = e match {
+      case _:LetDef | _:Let | _:LetTuple => false 
+      case _ => true
+    }
+
     tree match {
       case Variable(id) => sb.append(idToString(id))
       case DeBruijnIndex(idx) => sys.error("Not Valid Scala")
@@ -64,7 +69,9 @@ class ScalaPrinter(sb: StringBuffer = new StringBuffer) extends PrettyPrinter(sb
               }
           }
           sb.append(") = ")
+          if (!isSimple(d)) sb.append("{ ")
           pp(d, p)
+          if (!isSimple(d)) sb.append("}")
           sb.append("\n")
           ind
           pp(e, p)
@@ -73,9 +80,11 @@ class ScalaPrinter(sb: StringBuffer = new StringBuffer) extends PrettyPrinter(sb
 
       case Let(b,d,e) =>
         optBraces { implicit lvl =>
-          sb.append("val " + b + " = { ")
+          sb.append("val " + b + " = ")
+          if (!isSimple(d)) sb.append("{ ")
           pp(d, p)
-          sb.append("}\n")
+          if (!isSimple(d)) sb.append("}")
+          sb.append("\n")
           ind
           pp(e, p)
           sb.append("\n")

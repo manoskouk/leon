@@ -26,7 +26,7 @@ class MemoizationSuite extends LeonTestSuite {
   // Which tests we are performing
   val testLooseEq = false 
   val testMemo    = true
-
+ 
   // Define expressions which define CaseClass expression equality correctly
   def looseTypeEq(t1 : TypeTree, t2: TypeTree) : Boolean = (t1, t2) match {
     case (AnyType, AnyType) | (BottomType, BottomType) | (BooleanType, BooleanType) | 
@@ -77,7 +77,7 @@ class MemoizationSuite extends LeonTestSuite {
         val originalFields = args1.take(l) zip args2.take(l)
         originalFields forall { case (f1,f2) => looseEq(f1, f2) }
       }
-      else false 
+      else false  
     
     
     // FIXME : Hope that sets return items in the same order too...

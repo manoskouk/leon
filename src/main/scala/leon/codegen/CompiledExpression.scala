@@ -67,4 +67,41 @@ class CompiledExpression(unit: CompilationUnit, cf: ClassFile, expression : Expr
       case ite : InvocationTargetException => throw ite.getCause()
     }
   }
+
+  // Apply function recursively howMany times, which is of type (A, Int) => A
+  // Memoization-specific
+  // FIXME: Could write straight bytecode for this
+  def recEval(arg: Expr, howMany : Int) : Expr = {
+    try {
+      // pseudorandom input
+      def psr(i : Int) = (347837 * i + 983876) % 98291
+/*
+      val jvmArg = unit.valueToJVM(arg)
+      // Not optimized?
+      def rec(jvmArg: AnyRef, howMany: Int) : AnyRef = {
+        if (howMany == 0) jvmArg
+        else { 
+          val jvmInp = unit.valueToJVM( IntLiteral(psr(howMany)) )
+          rec( evalToJVM(Seq(jvmArg, jvmInp)), howMany-1 )
+        }
+      }
+      
+      unit.jvmToValue(rec(jvmArg, howMany))*/
+      
+      var jvmArg = unit.valueToJVM(arg)
+      var i = howMany
+      while(i > 0) { 
+        val jvmInp = unit.valueToJVM(IntLiteral(psr(i)))
+        jvmArg = evalToJVM(Seq(jvmArg,jvmInp))
+        i = i - 1
+      }
+
+      unit.jvmToValue(jvmArg)
+
+    } catch {
+      case ite : InvocationTargetException => throw ite.getCause()
+    }
+  }
+
+
 } 

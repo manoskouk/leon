@@ -90,42 +90,126 @@ class CompilationUnit(val program: Program, val classes: Map[Definition, ClassFi
   }
 
   // Note that this may produce untyped expressions! (typically: sets, maps)
-  private[codegen] def jvmToValue(e: AnyRef): Expr = e match {
-    case i: Integer =>
-      IntLiteral(i.toInt)
+  // re-implemented tail recursively
+  private[codegen] def jvmToValue(e: AnyRef): Expr = {
+    import scala.collection.immutable.Stack
+    def postOrder(e : AnyRef) : Stack[AnyRef] = {
+      @scala.annotation.tailrec
+      def postOrderAcc(toSee: Stack[AnyRef], acc : Stack[AnyRef]) : Stack[AnyRef]= { 
+        if (toSee.isEmpty) acc
+        else {
+          val (top, rest) = toSee.pop2
+          top match {
+            case _:Integer| _: java.lang.Boolean =>
+              postOrderAcc(rest, acc push top)
+            case cc: runtime.CaseClass =>
+              val fields = cc.productElements()
+              postOrderAcc(rest pushAll fields, acc push top)
+            case tpl : runtime.Tuple =>
+              val elems = for (i <- 0 until tpl.getArity) yield { tpl.get(i) }
+              postOrderAcc(rest pushAll elems, acc push top)
+            case set : runtime.Set => 
+              val elems = set.getElements().asScala
+              postOrderAcc(rest pushAll elems, acc push top)
+            case map : runtime.Map =>
+              val flatPairs = map.getElements().asScala.flatMap { entry =>
+                Seq(entry.getKey(), entry.getValue())
+              }
+              postOrderAcc(rest pushAll flatPairs, acc push top)
+            case _ =>
+              throw CompilationException("Unsupported return value : " + top.getClass)
+          }
+        }
 
-    case b: java.lang.Boolean =>
-      BooleanLiteral(b.booleanValue)
-
-    case cc: runtime.CaseClass =>
-      val fields = cc.productElements()
-
-      jvmClassToDef.get(e.getClass.getName) match {
-        case Some(cc: CaseClassDef) =>
-          CaseClass(cc, fields.map(jvmToValue))
-        case _ =>
-          throw CompilationException("Unsupported return value : " + e)
       }
 
-    case tpl: runtime.Tuple =>
-      val elems = for (i <- 0 until tpl.getArity) yield {
-        jvmToValue(tpl.get(i))
+      postOrderAcc(new Stack[AnyRef]().push(e), new Stack[AnyRef]())
+    }
+
+    def postOrderReconstruct(inp: Stack[AnyRef]) : Expr = {
+      @scala.annotation.tailrec
+      def postOrderAcc(inp : Stack[AnyRef], outp : Stack[Expr]) : Expr = {
+        if (inp.isEmpty) outp.head
+        else {
+          val (top, rest) = inp.pop2
+          top match {
+            case i:Integer =>
+              postOrderAcc(rest, outp push IntLiteral(i.toInt)) 
+            case b: java.lang.Boolean =>
+              postOrderAcc(rest, outp push BooleanLiteral(b.booleanValue)) 
+            case cc: runtime.CaseClass =>
+              jvmClassToDef.get(top.getClass.getName) match {
+                case Some(ccd:CaseClassDef) =>
+                  val (children, outp1) = outp.splitAt(cc.productElements().size)
+                  val outCC = CaseClass(ccd, children.toSeq.reverse)
+                  postOrderAcc(rest, outp1 push outCC)
+                // FIXME added this
+                case Some(_) => throw CompilationException("Unsupported return value : " + top)
+                case None    => throw CompilationException("Unsupported return value : " + top)
+              }
+            case tpl : runtime.Tuple =>
+              val (children, outp1) = outp.splitAt(tpl.getArity)
+              val outTpl = Tuple(children.toSeq.reverse)
+              postOrderAcc(rest, outp1 push outTpl)
+            case set : runtime.Set => 
+              val (children, outp1) = outp.splitAt(set.size()) 
+              val outSet = FiniteSet(children.toSeq.reverse) 
+              postOrderAcc(rest, outp1 push outSet)
+            case map : runtime.Map =>
+              val (children, outp1) = outp.splitAt(2 * map.size()) 
+              val (keys, vals) = children.zipWithIndex.partition {case (_, ind) => ind % 2 == 0}
+              val outPairs = keys.zip(vals).map { case ( (key, _), (vl, _) ) => (key,vl) } 
+              val outMap = FiniteMap(outPairs.toSeq.reverse)
+              postOrderAcc(rest, outp1 push outMap)
+          }
+        }
       }
-      Tuple(elems)
 
-    case set : runtime.Set =>
-      FiniteSet(set.getElements().asScala.map(jvmToValue).toSeq)
+      postOrderAcc(inp, new Stack[Expr]())
+        
 
-    case map : runtime.Map =>
-      val pairs = map.getElements().asScala.map { entry =>
-        val k = jvmToValue(entry.getKey())
-        val v = jvmToValue(entry.getValue())
-        (k, v)
-      }
-      FiniteMap(pairs.toSeq)
+    }
 
-    case _ =>
-      throw CompilationException("Unsupported return value : " + e.getClass)
+    postOrderReconstruct(postOrder(e))
+
+    /*
+    e match {
+      case i: Integer =>
+        IntLiteral(i.toInt)
+
+      case b: java.lang.Boolean =>
+        BooleanLiteral(b.booleanValue)
+
+      case cc: runtime.CaseClass =>
+        val fields = cc.productElements()
+
+        jvmClassToDef.get(e.getClass.getName) match {
+          case Some(cc: CaseClassDef) =>
+            CaseClass(cc, fields.map(jvmToValue))
+          case _ =>
+            throw CompilationException("Unsupported return value : " + e)
+        }
+
+      case tpl: runtime.Tuple =>
+        val elems = for (i <- 0 until tpl.getArity) yield {
+          jvmToValue(tpl.get(i))
+        }
+        Tuple(elems)
+
+      case set : runtime.Set =>
+        FiniteSet(set.getElements().asScala.map(jvmToValue).toSeq)
+
+      case map : runtime.Map =>
+        val pairs = map.getElements().asScala.map { entry =>
+          val k = jvmToValue(entry.getKey())
+          val v = jvmToValue(entry.getValue())
+          (k, v)
+        }
+        FiniteMap(pairs.toSeq)
+
+      case _ =>
+        throw CompilationException("Unsupported return value : " + e.getClass)
+    }*/
   }
 
   def compileExpression(e: Expr, args: Seq[Identifier]): CompiledExpression = {

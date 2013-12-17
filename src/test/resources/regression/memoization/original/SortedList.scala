@@ -135,7 +135,7 @@ object SortedList {
     case Cons(x, xs@Cons(y, ys)) => x <= y && isSorted(xs)
   }
 
-  
+/*  
   def psr (input : Int) : Int = {
     (input * 476272 + 938709) % 187987
   }
@@ -147,6 +147,9 @@ object SortedList {
   def test(size : Int) : List = { 
       rec(size, Nil())
   }
-
+*/
+  
+  def test(l : List, i : Int) : List = insert1(l,i)
+  def init() = Nil()
 
 }

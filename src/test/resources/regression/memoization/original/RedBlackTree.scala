@@ -57,7 +57,7 @@ object RedBlackTree {
     case Node(color,l,e,r) => Node(color,flip(r),e,flip(l))
   }
 
-  
+/*  
   def psr (input : Int) : Int = {
     (input * 476272 + 938709) % 187987
   }
@@ -69,6 +69,9 @@ object RedBlackTree {
   def test(size : Int) : Tree = { 
       rec(size, Empty())
   }
+*/
 
+  def test(t:Tree, i : Int) : Tree = ins(i,t)
+  def init() = Empty()
 
 }

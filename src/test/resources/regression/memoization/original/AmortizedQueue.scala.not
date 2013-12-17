@@ -1,3 +1,5 @@
+// reverse is not implemented tail-recursively! :(
+
 import leon.Utils._
 import leon.Annotations._
 
@@ -209,8 +211,7 @@ object AmortizedQueue {
       true
   } holds
 
-  def emptyQueue() : AbsQueue = Queue(Nil(), Nil())
-  // pseudorandom els. to insert
+/*  // pseudorandom els. to insert
   def psr (input : Int) : Int = {
     (input * 476272 + 938709) % 187987
   }
@@ -222,6 +223,9 @@ object AmortizedQueue {
   def test(size : Int) : AbsQueue = { 
       rec(size, emptyQueue)
   }
-
+*/
+  def emptyQueue() : AbsQueue = Queue(Nil(), Nil())
+  def test(q:AbsQueue, i:Int) : AbsQueue = enqueue(q,i)
+  def init() : AbsQueue = emptyQueue()
 
 }

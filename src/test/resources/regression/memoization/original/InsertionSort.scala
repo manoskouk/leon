@@ -14,12 +14,12 @@ object InsertionSort {
     case Nil() => 0
     case Cons(_, xs) => 1 + size(xs)
   }) ensuring(_ >= 0)
-
+/*
   def contents(l: List): Set[Int] = l match {
     case Nil() => Set.empty
     case Cons(x,xs) => contents(xs) ++ Set(x)
   }
-
+*/
   def min(l : List) : OptInt = l match {
     case Nil() => None()
     case Cons(x, xs) => min(xs) match {
@@ -59,12 +59,16 @@ object InsertionSort {
       case Nil() => Cons(e,Nil())
       case Cons(x,xs) => if (x <= e) Cons(x,sortedIns(e, xs)) else Cons(e, l)
     }
-  } ensuring(res => contents(res) == contents(l) ++ Set(e) && isSorted(res))
+  } ensuring(res => //contents(res) == contents(l) ++ Set(e) && 
+    isSorted(res)
+  )
 
   def sort(l: List): List = (l match {
     case Nil() => Nil()
     case Cons(x,xs) => sortedIns(x, sort(xs))
-  }) ensuring(res => contents(res) == contents(l) && isSorted(res))
+  }) ensuring(res =>// contents(res) == contents(l) && 
+    isSorted(res)
+  )
 /*
   def main(args: Array[String]): Unit = {
     val ls: List = Cons(5, Cons(2, Cons(4, Cons(5, Cons(1, Cons(8,Nil()))))))
@@ -72,7 +76,7 @@ object InsertionSort {
     println(ls)
     println(sort(ls))
   }
-*/
+*//*
   def psr (input : Int) : Int = {
     (input * 476272 + 938709) % 187987
   }
@@ -85,5 +89,8 @@ object InsertionSort {
       val l = rec(size, Nil())
       sort(l)
   }
+*/
 
+  def test(l:List , i:Int) : List = sortedIns(i,l)
+  def init() : List = Nil()
 }

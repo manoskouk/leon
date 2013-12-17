@@ -164,9 +164,10 @@ class CompilationUnit(val ctx: LeonContext,
     case tpl: runtime.Tuple =>
       val elems = for (i <- 0 until tpl.getArity) yield {
         jvmToExpr(tpl.get(i))
-      }
-      Tuple(elems)
 
+      }
+    
+    <<<<<<< HEAD
     case gv : GenericValue =>
       gv
 
@@ -180,10 +181,93 @@ class CompilationUnit(val ctx: LeonContext,
         (k, v)
       }
       FiniteMap(pairs.toSeq)
-
-    case _ =>
-      throw CompilationException("Unsupported return value : " + e.getClass)
   }
+/*
+  =======
+  // re-implemented tail recursively
+  private[codegen] def jvmToValue(e: AnyRef): Expr = {
+    import scala.collection.immutable.Stack
+    def postOrder(e : AnyRef) : Stack[AnyRef] = {
+      @scala.annotation.tailrec
+      def postOrderAcc(toSee: Stack[AnyRef], acc : Stack[AnyRef]) : Stack[AnyRef]= { 
+        if (toSee.isEmpty) acc
+        else {
+          val (top, rest) = toSee.pop2
+          top match {
+            case _:Integer| _: java.lang.Boolean =>
+              postOrderAcc(rest, acc push top)
+            case cc: runtime.CaseClass =>
+              val fields = cc.productElements()
+              postOrderAcc(rest pushAll fields, acc push top)
+            case tpl : runtime.Tuple =>
+              val elems = for (i <- 0 until tpl.getArity) yield { tpl.get(i) }
+              postOrderAcc(rest pushAll elems, acc push top)
+            case set : runtime.Set => 
+              val elems = set.getElements().asScala
+              postOrderAcc(rest pushAll elems, acc push top)
+            case map : runtime.Map =>
+              val flatPairs = map.getElements().asScala.flatMap { entry =>
+                Seq(entry.getKey(), entry.getValue())
+              }
+              postOrderAcc(rest pushAll flatPairs, acc push top)
+            case _ =>
+              throw CompilationException("Unsupported return value : " + top.getClass)
+          }
+        }
+
+      }
+
+      postOrderAcc(new Stack[AnyRef]().push(e), new Stack[AnyRef]())
+    }
+
+    def postOrderReconstruct(inp: Stack[AnyRef]) : Expr = {
+      @scala.annotation.tailrec
+      def postOrderAcc(inp : Stack[AnyRef], outp : Stack[Expr]) : Expr = {
+        if (inp.isEmpty) outp.head
+        else {
+          val (top, rest) = inp.pop2
+          top match {
+            case i:Integer =>
+              postOrderAcc(rest, outp push IntLiteral(i.toInt)) 
+            case b: java.lang.Boolean =>
+              postOrderAcc(rest, outp push BooleanLiteral(b.booleanValue)) 
+            case cc: runtime.CaseClass =>
+              jvmClassToDef.get(top.getClass.getName) match {
+                case Some(ccd:CaseClassDef) =>
+                  val (children, outp1) = outp.splitAt(cc.productElements().size)
+                  val outCC = CaseClass(ccd, children.toSeq.reverse)
+                  postOrderAcc(rest, outp1 push outCC)
+                // FIXME added this
+                case Some(_) => throw CompilationException("Unsupported return value : " + top)
+                case None    => throw CompilationException("Unsupported return value : " + top)
+              }
+            case tpl : runtime.Tuple =>
+              val (children, outp1) = outp.splitAt(tpl.getArity)
+              val outTpl = Tuple(children.toSeq.reverse)
+              postOrderAcc(rest, outp1 push outTpl)
+            case set : runtime.Set => 
+              val (children, outp1) = outp.splitAt(set.size()) 
+              val outSet = FiniteSet(children.toSeq.reverse) 
+              postOrderAcc(rest, outp1 push outSet)
+            case map : runtime.Map =>
+              val (children, outp1) = outp.splitAt(2 * map.size()) 
+              val (keys, vals) = children.zipWithIndex.partition {case (_, ind) => ind % 2 == 0}
+              val outPairs = keys.zip(vals).map { case ( (key, _), (vl, _) ) => (key,vl) } 
+              val outMap = FiniteMap(outPairs.toSeq.reverse)
+              postOrderAcc(rest, outp1 push outMap)
+          }
+        }
+      }
+
+      postOrderAcc(inp, new Stack[Expr]())
+        
+
+    }
+
+    postOrderReconstruct(postOrder(e))
+  }
+>>>>>>> jvmToExpr is now tail-recursive
+*/
 
   def compileExpression(e: Expr, args: Seq[Identifier]): CompiledExpression = {
     if(e.getType == Untyped) {

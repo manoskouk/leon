@@ -199,7 +199,7 @@ object AVLTree  {
       case _ => t // this should not happen
   } } 
 
-  
+ /* 
   def psr (input : Int) : Int = {
     (input * 476272 + 938709) % 187987
   }
@@ -214,7 +214,10 @@ object AVLTree  {
     rec(size, Leaf())
 
   }
+*/
 
+  def test(t:Tree, i:Int) = avlInsert(t,i)
+  def init() = Leaf()
 
 }
     

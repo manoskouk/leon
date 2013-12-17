@@ -53,79 +53,119 @@ class MemoizationSuite extends LeonTestSuite {
   // equality on data structures according to name only, 
   // so as to compare structures from input and output programs
   // currently only compares constants
-  def looseEq(e1: Expr, e2: Expr) : Boolean = (e1, e2) match { 
+  // handles large test cases, so uses side effects
+  def looseEq(e1: Expr, e2: Expr) : Boolean = {
+    import scala.collection.mutable._
+    val q = new Queue[(Expr,Expr)]()
 
-   
-    case ( IntLiteral(i1), IntLiteral(i2) ) => i1 == i2 
-    case ( StringLiteral(s1), StringLiteral(s2) ) => s1 == s2
-    case ( BooleanLiteral(b1), BooleanLiteral(b2) ) =>  b1 == b2
-    case ( UnitLiteral, UnitLiteral ) => true
-    case ( FiniteArray(exs1), FiniteArray(exs2) ) => 
-      exs1 zip exs2 forall { case (ex1, ex2) => ex1 == ex2 }
-    case ( NilList(t1), NilList(t2) ) => looseTypeEq(t1,t2)
-    case ( Cons(h1, t1) , Cons(h2,t2) ) => 
-      looseEq(h1,h2) && looseEq(t1,t2)
-    case ( Tuple(exprs1), Tuple(exprs2) ) => 
-      exprs1.length == exprs2.length && 
-      (exprs1 zip exprs2 forall { case (ex1, ex2) => looseEq(ex1,ex2) } )
-    case ( Error(_), Error(_)) => true
-    
-    
-    case ( CaseClass(c1, args1), CaseClass(c2, args2) ) => 
-      if (c1.id.name ==  c2.id.name) { 
-        val l = scala.math.min(args1.length, args2.length)
-        val originalFields = args1.take(l) zip args2.take(l)
-        originalFields forall { case (f1,f2) => looseEq(f1, f2) }
+    def localEq(e1:Expr, e2:Expr) : Boolean = (e1, e2) match { 
+      case ( IntLiteral(i1), IntLiteral(i2) ) => 
+        i1 == i2 
+      case ( StringLiteral(s1), StringLiteral(s2) ) => 
+        s1 == s2
+      case ( BooleanLiteral(b1), BooleanLiteral(b2) ) =>  
+        b1 == b2
+      case ( UnitLiteral, UnitLiteral ) => 
+        true
+      case ( FiniteArray(exs1), FiniteArray(exs2) ) =>
+        if (exs1.length != exs2.length) false 
+        else { 
+          exs1 zip exs2 foreach { q += _ } 
+          true
+        }
+      case ( NilList(t1), NilList(t2) ) => 
+        looseTypeEq(t1,t2)
+      case ( Cons(h1, t1) , Cons(h2,t2) ) => {
+        q += ((h1,h2),(t1,t2))
+        true
       }
-      else false  
-    
-    
-    // FIXME : Hope that sets return items in the same order too...
-    case ( f1@FiniteMap(pairs1), f2@FiniteMap(pairs2) ) => 
-      if(pairs1.isEmpty && pairs2.isEmpty) {
-        looseTypeEq(f1.getType, f2.getType)
-      } else {
-        pairs1.size == pairs2.size && 
-        ( pairs1 zip pairs2  forall { case ((from1,to1), (from2,to2)) => 
-          looseEq(from1, from2) && looseEq(to1,to2)
-        } )
-      }
+      case ( Tuple(exs1), Tuple(exs2) ) =>  
+        if (exs1.length != exs2.length) false 
+        else { 
+          exs1 zip exs2 foreach { q += _ } ;
+          true
+        }
+      case ( Error(_), Error(_)) => 
+        true      
+      case ( CaseClass(c1, args1), CaseClass(c2, args2) ) => 
+        
+        if (c1.id.name == c2.id.name) { 
+          val l = scala.math.min(args1.length, args2.length)
+          val originalFields = args1.take(l) zip args2.take(l)
+          originalFields foreach { q += _ }
+          true
+        }
+        else false  
+      
+      
+      // FIXME : Hope that sets return items in the same order too...
+      case ( f1@FiniteMap(pairs1), f2@FiniteMap(pairs2) ) => 
+        if(pairs1.isEmpty && pairs2.isEmpty) {
+          looseTypeEq(f1.getType, f2.getType)
+        } 
+        else {
+          if ( pairs1.size == pairs2.size ) { 
+            pairs1 zip pairs2 foreach { case ((from1,to1), (from2,to2)) => 
+              q.enqueue( (from1, from2), (to1,to2) )
+            }
+            true
+          }
+          else false 
+        }
 
-    case ( f1@FiniteSet(els1), f2@FiniteSet(els2) ) => 
-      if(els1.isEmpty && els2.isEmpty) {
-        looseTypeEq(f1.getType, f2.getType)
-      } else {
-        els1.size == els2.size && 
-        ( els1 zip els2 forall { case (el1, el2) => looseEq(el1, el2) } )
-      }
-    case ( f1@FiniteMultiset(els1), f2@FiniteMultiset(els2) ) => 
-      if(els1.isEmpty && els2.isEmpty) {
-        looseTypeEq(f1.getType, f2.getType)
-      } else {
-        els1.size == els2.size && 
-        ( els1 zip els2 forall { case (el1, el2) => looseEq(el1, el2) } )
-      }
-    case ( EmptyMultiset(t1), EmptyMultiset(t2) ) => 
-      looseTypeEq(t1,t2)
+      case ( f1@FiniteSet(els1), f2@FiniteSet(els2) ) => 
+        if(els1.isEmpty && els2.isEmpty) {
+          looseTypeEq(f1.getType, f2.getType)
+        } 
+        else { 
+          if ( els1.size == els2.size ) { 
+            els1 zip els2 foreach { q += _ }
+            true
+          } 
+          else false 
+        }
+
+      case ( f1@FiniteMultiset(els1), f2@FiniteMultiset(els2) ) => 
+        if(els1.isEmpty && els2.isEmpty) {
+          looseTypeEq(f1.getType, f2.getType)
+        } 
+        else {
+          if ( els1.size == els2.size ) { 
+            els1 zip els2 foreach { q += _ }
+            true
+          } 
+          else false 
+        }
+      case ( EmptyMultiset(t1), EmptyMultiset(t2) ) => 
+        looseTypeEq(t1,t2)
 
 
-    /*
-    case ( Choose(vars1, pred1), Choose(vars2, preds2) ) => true // FIXME
-    case ( Let(bind1, val1, bd1), Let(bind2, val2, bd2) ) => true
-    case ( LetTuple(bind1, val1, bd1), LetTuple(bind2, val2, bd2) ) => true
-    case ( LetDef(fd1, bd1), LetDef(fd2,bd2) ) => true
-    case ( FunctionInvocation(f1, args1), FunctionInvocation(f2, args2)) => true
-    case ( IfExpr(cond1, thenn1, elze1), IfExpr(cond1, thenn1, elze1)) =>
-    case ( TupleSelect(tpl1, index1), TupleSelect(tpl1, index1) ) => true
-    case ( MatchExpr(scr1, cases1), MatchExpr(scr2, cases2) ) => true
-    case ( And(exprs1), And(exprs2) ) => 
-    case ( Or(exprs1), Or(exprs2) ) => 
-    case ( Iff(l1, r1), Iff(l2, r2) ) => 
-    case ( Implies(l1, r1), Implies(l2, r2) ) => 
-    case ( Not(
-*/
-    case _ => false 
+      /*
+      case ( Choose(vars1, pred1), Choose(vars2, preds2) ) => true // FIXME
+      case ( Let(bind1, val1, bd1), Let(bind2, val2, bd2) ) => true
+      case ( LetTuple(bind1, val1, bd1), LetTuple(bind2, val2, bd2) ) => true
+      case ( LetDef(fd1, bd1), LetDef(fd2,bd2) ) => true
+      case ( FunctionInvocation(f1, args1), FunctionInvocation(f2, args2)) => true
+      case ( IfExpr(cond1, thenn1, elze1), IfExpr(cond1, thenn1, elze1)) =>
+      case ( TupleSelect(tpl1, index1), TupleSelect(tpl1, index1) ) => true
+      case ( MatchExpr(scr1, cases1), MatchExpr(scr2, cases2) ) => true
+      case ( And(exprs1), And(exprs2) ) => 
+      case ( Or(exprs1), Or(exprs2) ) => 
+      case ( Iff(l1, r1), Iff(l2, r2) ) => 
+      case ( Implies(l1, r1), Implies(l2, r2) ) => 
+      case ( Not(
+      */
+      case _ => false 
+    }       
     
+    
+    q += ((e1,e2))
+    while (!q.isEmpty) {
+      val (e1,e2) = q.dequeue()
+      if (!localEq(e1,e2)) return false
+    }
+    return true
+
   }
 
   // Time a block and return time in microseconds
@@ -149,8 +189,8 @@ class MemoizationSuite extends LeonTestSuite {
   val outputFilePath = "regression/memoization/memoOut"
   val testFilePath   = "regression/memoization/tests"
 
-  //val testSizes = Seq(10,1000,100000,10000000)
-  val testSizes = Seq(10,100,250)
+  val testSizes = Seq(10,1000, 2500, 10000)
+  //val testSizes = Seq(10, 250)// 100000, 10000000)
 
   private def testMemo(f : File) { 
     val outFile  = new File ( 
@@ -184,37 +224,40 @@ class MemoizationSuite extends LeonTestSuite {
       val transAST2 = pipeFront.run(ctx)(outFile.getAbsolutePath :: Nil) 
 
       
-      def compileTestFun(p : Program) : Seq[Expr] => EvaluationResults.Result = { 
+      def compileTestFun(p : Program) : (Expr, (Expr, Int) => EvaluationResults.Result) = { 
         //ctx.reporter.info(PrettyPrinter(p))
         //ctx.reporter.info("Defined functions: " + (p.definedFunctions filter { _.hasImplementation } map (_.id.name) mkString(", ")))
         val evaluator = new CodeGenEvaluator(ctx, p)
-        val testFun =  p.definedFunctions.find(_.id.name == "test").getOrElse(
-          ctx.reporter.fatalError("test function not defined!")
-        )
+        val testFun =  p.definedFunctions.find(_.id.name == "test").getOrElse {
+          ctx.reporter.fatalError("Test function not defined!")
+        }
+        val initVal = p.definedFunctions.find(_.id.name == "init").getOrElse {
+          ctx.reporter.fatalError("Initial value not defined!")
+        }.body.get
+
         val args = testFun.args map { _.id }
         val body = testFun.body.get
 
-        evaluator.compile(body, args).getOrElse(ctx.reporter.fatalError("Failed to compile test expression!"))
+        (initVal, evaluator.compileRec(body, args).getOrElse{ctx.reporter.fatalError("Failed to compile test function!")})
       }
 
 
       ctx.reporter.info("Compiling original to bytecode")
-      val compiled1 = compileTestFun(origAST)
+      val (init1, compiled1) = compileTestFun(origAST)
       ctx.reporter.info("Compiling transformed to bytecode")
       // Cheating around bug
       // val ex2 = compileAndTest(transAST)
-      val compiled2 = compileTestFun(transAST2)
+      val (init2, compiled2) = compileTestFun(transAST2)
       
       for (size <- testSizes) { 
-        val input = Seq(IntLiteral(size)) 
-        val (res1, time1) = time{compiled1(input)}
-        val (res2, time2) = time{compiled2(input)} 
-        ctx.reporter.info("Results for input size " + size)
+        ctx.reporter.info("Now testing for input size " + size)
+        val (res1, time1) = time{compiled1(init1,size)}
+        val (res2, time2) = time{compiled2(init2,size)} 
         (res1, res2) match {
           case (Successful(ex1), Successful(ex2)) if (looseEq(ex1,ex2)) => {
-            ctx.reporter.info("  Both programs prouced the same output!")
-            ctx.reporter.info("  Time for original    : " + time1 + "microsec.")
-            ctx.reporter.info("  Time for transformed : " + time2 + "microsec.")
+            ctx.reporter.info("  Both programs produced the same output!")
+            ctx.reporter.info("  Time for original    : " + time1 + " microsec.")
+            ctx.reporter.info("  Time for transformed : " + time2 + " microsec.")
           } 
           case (RuntimeError(mess1), RuntimeError(mess2)) => 
             ctx.reporter.info("  Both programs produced an error") 
@@ -222,7 +265,11 @@ class MemoizationSuite extends LeonTestSuite {
             ctx.reporter.fatalError ("  Evaluation failed with message: " + mess1)
           case (_, EvaluatorError(mess2) ) => 
             ctx.reporter.fatalError ("  Evaluation failed with message: " + mess2)
-          case _ => ctx.reporter.fatalError("  Outputs don't match for input size " + size) 
+          case _ => 
+            ctx.reporter.error("Error")
+            ctx.reporter.error("  Result1 = \n" + res1.toString)
+            ctx.reporter.error("  Result2 = \n" + res2.toString)
+            ctx.reporter.fatalError("  Outputs don't match for input size " + size) 
         }
       }
 

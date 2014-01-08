@@ -189,8 +189,8 @@ class MemoizationSuite extends LeonTestSuite {
   val outputFilePath = "regression/memoization/memoOut"
   val testFilePath   = "regression/memoization/tests"
 
-  val testSizes = Seq(10,1000, 2500, 10000)
-  //val testSizes = Seq(10, 250)// 100000, 10000000)
+  //val testSizes = Seq(10,1000, 2500, 10000, 20000)
+  val testSizes = Seq(10, 250)// 100000, 10000000)
 
   private def testMemo(f : File) { 
     val outFile  = new File ( 

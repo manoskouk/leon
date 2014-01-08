@@ -66,7 +66,10 @@ object AnalysisPhase extends LeonPhase[Program,VerificationReport] {
 
     val interruptManager = vctx.context.interruptManager
 
-    for((funDef, vcs) <- vcs.toSeq.sortWith((a,b) => a._1.getPos < b._1.getPos); vcInfo <- vcs if !interruptManager.isInterrupted()) {
+    for(
+      (funDef, vcs) <- vcs.toSeq.sortWith((a,b) => a._1.getPos < b._1.getPos); 
+      vcInfo        <- vcs if !interruptManager.isInterrupted()
+    ) {
       val funDef = vcInfo.funDef
       val vc = vcInfo.condition
 

@@ -82,10 +82,15 @@ object AnalysisPhase extends LeonPhase[Program,VerificationReport] {
     allVCs
   }
 
+  
   def checkVerificationConditions(vctx: VerificationContext, vcs: Map[FunDef, List[VerificationCondition]]) : VerificationReport = {
+    
     import vctx.reporter
     import vctx.solverFactory
     import vctx.program
+    val reporter = vctx.reporter
+    val solvers  = vctx.solvers
+    val p        = vctx.program
 
     val interruptManager = vctx.context.interruptManager
 
@@ -153,9 +158,7 @@ object AnalysisPhase extends LeonPhase[Program,VerificationReport] {
         s.free()
       }
     }
-
-    val report = new VerificationReport(vcs)
-    report
+    new VerificationReport(p, vcs)
   }
 
   def run(ctx: LeonContext)(program: Program) : VerificationReport = {
@@ -198,7 +201,6 @@ object AnalysisPhase extends LeonPhase[Program,VerificationReport] {
       SolverFactory( () => new PortfolioSolver(ctx, solversToUse.values.toSeq) with TimeoutSolver)
     }
 
-
     val mainSolver = timeout match {
       case Some(sec) =>
         new TimeoutSolverFactory(entrySolver, sec*1000L)
@@ -209,7 +211,7 @@ object AnalysisPhase extends LeonPhase[Program,VerificationReport] {
     val vctx = VerificationContext(ctx, program, mainSolver, reporter)
 
     reporter.debug("Running verification condition generation...")
-    val vcs = generateVerificationConditions(vctx, functionsToAnalyse)
-    checkVerificationConditions(vctx, vcs)
+    val vcs = generateVerificationConditions(reporter, program, functionsToAnalyse)
+    checkVerificationConditions(program, vctx, vcs)
   }
 }

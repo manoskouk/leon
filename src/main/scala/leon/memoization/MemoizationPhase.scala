@@ -17,10 +17,14 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
     "where data stuctures keep Memoization information"
 
   // Reporting
-  implicit val debugSection = DebugSectionMemoization
-  var ctx : LeonContext = null
-  def dbg(x:String) = ctx.reporter.debug(x)
+  private implicit val debugSection = DebugSectionMemoization
+  private var ctx : LeonContext = null
+  private def dbg(x:String) = ctx.reporter.debug(x)
   
+
+  // Identifier printing strategy 
+  private val alwaysShowUniqueId = true
+  private def freshIdentifier (name : String) = FreshIdentifier(name, alwaysShowUniqueId)
 
   abstract class MemoClassRecord[+A <: ClassTypeDef](
     val p : Program,
@@ -30,7 +34,7 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
   ) {
     
     // Functions which recursively call themselves with their only argument being of type classDef
-    val classDefRecursiveFuns : List[FunDef] = { candidateFuns filter { f =>// p.definedFunctions.toList filter { f => 
+    val classDefRecursiveFuns : List[FunDef] = { candidateFuns filter { f =>
       f.args.head.getType.asInstanceOf[ClassType].classDef == classDef &&
       ( 
         // TODO : clear out what happens in these cases.   
@@ -38,30 +42,19 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
           f.returnType.asInstanceOf[ClassType].classDef.hierarchyRoot != classDef.hierarchyRoot 
         }
         else true 
-      ) /*&&
-      // skip proven functions
-      ( 
-        if (candidateFuns contains f) true 
-        else {
-          ctx.reporter.debug("Not memoizing function " + f.id.name + 
-            " for type " + classDef.id.name + 
-            "\nbecause we don't need it to monitor unproven VCs."
-          )
-          false 
-        }
-      )*/   
+      )
     }}.toList
     val hasLocalMemoFuns = !classDefRecursiveFuns.isEmpty
     
     // Extra fields we are adding to the type. None if there is nothing to add
     val extraFieldAbstr : Option[AbstractClassDef] = {
       if (!hasLocalMemoFuns) None 
-      else Some ( new AbstractClassDef(id = FreshIdentifier(classDef.id + "FieldsAbstract")) )
+      else Some ( new AbstractClassDef(id = freshIdentifier(classDef.id + "FieldsAbstract")) )
     }
     val extraFieldConcr : Option[CaseClassDef] = {
       if (!hasLocalMemoFuns) None 
       else Some ({
-        val concr = new CaseClassDef(id = FreshIdentifier(classDef.id + "Fields") )
+        val concr = new CaseClassDef(id = freshIdentifier(classDef.id + "Fields") )
         concr.setParent(extraFieldAbstr.get)
         concr.fields = classDefRecursiveFuns map { fn => 
           new VarDecl(fn.id.freshen, fn.returnType) 
@@ -121,37 +114,14 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
 
 
     // Add all memoized functions from top of the tree as fields
-    // Works with side effects! 
-    def enrichClassDef() : Unit 
+    // Works with side effects!
+    def enrichClassDef() : Unit
     enrichClassDef()
-      
+ 
 
 
-    // New versions of funsToMemoize, utilizing the memoized field
-    def memoizedFuns : List[FunDef] = classDefRecursiveFuns map { fn =>
-      // Identifier of the input function
-      val oldArg = fn.args.head.id
-      // the new argument will have the new type corresponding to this type
-      val newArg = new VarDecl(FreshIdentifier(oldArg.name), classType )
-      val newFun = new FunDef(
-        id = FreshIdentifier(fn.id.name),
-        returnType = fn.returnType, // This is correct only with side-effects
-        args = List(newArg)
-      )
-      // The object whose field we select is an application of fieldExtractor on newArg
-      val argVar = Variable(newArg.id).setType(classType)
-      val bodyObject = new FunctionInvocation( fieldExtractor.get, List(argVar) )
-      newFun.body = Some(CaseClassSelector(
-        extraFieldConcr.get, 
-        bodyObject, 
-        extraFieldConcr.get.fields.find{ _.id.name == fn.id.name }.get.id
-      ))
-
-      newFun
-    }
-
-   
-    
+ 
+ 
     // A new constructor for the caseclass type to make sure 
     // all fields are created with invariants
     val constructor: Option[FunDef]
@@ -160,16 +130,16 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
 
     // Make a function that retrieves the newly created fields from the new types
     // This function has to separate cases for the leaf types of this type
-    def fieldExtractor : Option[FunDef] = if (!hasLocalMemoFuns) None else Some({
+    lazy val fieldExtractor : Option[FunDef] = if (!hasLocalMemoFuns) None else Some({
       
       // Running example in the comments : say we start with a class called ClassName 
 
       // Name of resulting function e.g. classNameFields
-      val funName = idToLowerCase(extraFieldConcr.get.id) 
+      val funName = idToFreshLowerCase(extraFieldConcr.get.id) 
       // Return type of res. function. e.g. ClassNameFields
       val retType = classDefToClassType(extraFieldConcr.get) 
       // Name of parameter e.g. className
-      val paramName = idToLowerCase(classDef.id)
+      val paramName = idToFreshLowerCase(classDef.id)
       // Args of resulting function, e.g. ( className : ClassName )
       val args = List(new VarDecl(paramName, classType)) 
 
@@ -177,7 +147,7 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
       val body: Expr = classDef match { 
         case cc : CaseClassDef =>
           // Here the body is just retreiving the field
-          //CaseClassSelector(cc, Variable(idToLowerCase(cc.id)), funName)
+          //CaseClassSelector(cc, Variable(idToFreshLowerCase(cc.id)), funName)
           CaseClassSelector(cc, Variable(paramName), cc.fields.find(_.id.name == funName.name).get.id)
         case ab : AbstractClassDef => {
           // Construct the cases :
@@ -185,26 +155,42 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
           val caseClasses : List[CaseClassDef]= ( 
             this.caseDescendents map { _.classDef.asInstanceOf[CaseClassDef] } 
           )
+
+          /*
           // Case patterns
           val patterns = caseClasses map { cc => 
             new CaseClassPattern( 
-              binder       = Some(idToLowerCase(cc.id)),
+              binder       = Some(idToFreshLowerCase(cc.id)),
               caseClassDef = cc,
-              // this is a dodgy way to create repeated "_"s of the correct size
-              subPatterns  = cc.fields map (_ => new WildcardPattern(None))
+              subPatterns  = Seq.fill(cc.fields.length) (WildcardPattern(None))
             )
           }
           // case bodies
           val caseBodies = caseClasses map { cc => 
             new CaseClassSelector(
               cc, 
-              Variable(idToLowerCase(cc.id)), // FIXME maybe needs the pattern binder
+              Variable(idToFreshLowerCase(cc.id)), // FIXME maybe needs the pattern binder
               cc.fields.find( _.id.name == funName.name ).get.id
             )
           }
-          
+            
           // complete cases
           val cases = (patterns zip caseBodies) map { case (patt, bd) => new SimpleCase(patt, bd) }
+          */
+          val cases = for (cc <- caseClasses) yield {
+            val id = idToFreshLowerCase(cc.id)
+
+            val patt = new CaseClassPattern( Some(id), cc, 
+              Seq.fill(cc.fields.length) (WildcardPattern(None))
+            )
+
+            val bd = new CaseClassSelector( cc, Variable(id),
+              cc.fields.find( _.id.name == funName.name ).get.id
+            )
+
+            new SimpleCase(patt,bd)
+          }
+
 
           // the variable to do case analysis on
           val scrutinee = Variable(paramName).setType(classDefToClassType(ab))
@@ -221,6 +207,29 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
       //dbg(funDef.toString)
       funDef
     })
+
+    // New versions of funsToMemoize, utilizing the memoized field
+    lazy val memoizedFuns : List[FunDef] = classDefRecursiveFuns map { fn =>
+      // Identifier of the input function
+      val oldArg = fn.args.head.id
+      // the new argument will have the new type corresponding to this type
+      val newArg = new VarDecl(freshIdentifier(oldArg.name), classType )
+      val newFun = new FunDef(
+        id = freshIdentifier(fn.id.name), // FIXME use freshen
+        returnType = fn.returnType, // This is correct only with side-effects
+        args = List(newArg)
+      )
+      // The object whose field we select is an application of fieldExtractor on newArg
+      val argVar = Variable(newArg.id).setType(classType)
+      val bodyObject = new FunctionInvocation( fieldExtractor.get, List(argVar) )
+      newFun.body = Some(CaseClassSelector(
+        extraFieldConcr.get, 
+        bodyObject, 
+        extraFieldConcr.get.fields.find{ _.id.name == fn.id.name }.get.id
+      ))
+
+      newFun
+    }
 
 
   }
@@ -263,7 +272,7 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
       // The new vals we are going to be assigning the results of calling old function code into
       val assignedToVals : List[List[Identifier]] = extraCaseClasses map { 
         _.fields.toList map { field =>
-          FreshIdentifier(field.id.name + "_").setType(field.getType) 
+          freshIdentifier(field.id.name + "_").setType(field.getType) 
           // TODO: WHY DOES VARDECL OVERRIDE GETTYPE? :'(
         }
       }
@@ -437,7 +446,6 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
           // If we are trying to get a field of funDef, 
           // we can just get the function argument in the same position
           case CaseClassSelector(cc, Variable(vr), id) if (vr == funArg) =>
-            //Some( Variable(args(cc.fields.indexWhere(_.id == id))) )
             Some( Variable(args(cc.selectorID2Index(id)))) 
 
           // FIXME: Generally, we need to catch all expressions mentioning funArg
@@ -519,7 +527,7 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
       val body = assignments.  :\ (returnValue)(makeLetDef)
 
       val res = new FunDef(
-        FreshIdentifier("create" + classDef.id.name),
+        freshIdentifier("create" + classDef.id.name),
         classType,
         args map { arg => new VarDecl(arg, arg.getType) }
       )
@@ -590,14 +598,14 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
   // Take a ClassTypeDef and make a field with the same name (lower-case) 
   // and the correct type
   def varFromClassDef(cc : ClassTypeDef) : VarDecl = {
-    val newId = idToLowerCase(cc.id)
+    val newId = idToFreshLowerCase(cc.id)
     new VarDecl(newId, classDefToClassType(cc) )
   }
 
   // Take an Identifier and produce a fresh with lowewcase first letter
-  def idToLowerCase (id : Identifier) = {
+  def idToFreshLowerCase (id : Identifier) = {
     val nm = id.name
-    FreshIdentifier(nm.updated(0,nm.head.toLower))
+    freshIdentifier(nm.updated(0,nm.head.toLower))
   }
 
   /*
@@ -758,7 +766,7 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
     )
 
     // Make a new program containing the above definitions. 
-    val progName = FreshIdentifier(p.mainObject.id.name + "Expanded")
+    val progName = freshIdentifier(p.mainObject.id.name + "Expanded")
     val newProg = Program(progName, ObjectDef(
       progName,
       newNonMemoFuns ++ newClasses ++ newFuns ++ newConstructors, 

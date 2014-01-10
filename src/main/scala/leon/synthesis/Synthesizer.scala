@@ -85,7 +85,7 @@ class Synthesizer(val context : LeonContext,
 
     val vcs = generateVerificationConditions(reporter, npr, fds.map(_.id.name))
     val vctx = VerificationContext(context, Seq(solverf), context.reporter)
-    val vcreport = checkVerificationConditions(vctx, vcs)
+    val vcreport = checkVerificationConditions(program, vctx, vcs)
 
     if (vcreport.totalValid == vcreport.totalConditions) {
       (sol, true)

@@ -3,9 +3,9 @@
 package leon
 package verification
 
-import purescala.Definitions.FunDef
+import purescala.Definitions._
 
-class VerificationReport(val fvcs: Map[FunDef, List[VerificationCondition]]) {
+class VerificationReport(val program : Program, val fvcs: Map[FunDef, List[VerificationCondition]]) {
   val conditions : Seq[VerificationCondition] = fvcs.flatMap(_._2).toSeq.sortWith {
       (vc1,vc2) =>
         val id1 = vc1.funDef.id.name
@@ -37,7 +37,7 @@ class VerificationReport(val fvcs: Map[FunDef, List[VerificationCondition]]) {
 }
 
 object VerificationReport {
-  def emptyReport : VerificationReport = new VerificationReport(Map())
+  def emptyReport(p:Program) : VerificationReport = new VerificationReport(p,Map())
 
   private def fit(str : String, maxLength : Int) : String = {
     if(str.length <= maxLength) {

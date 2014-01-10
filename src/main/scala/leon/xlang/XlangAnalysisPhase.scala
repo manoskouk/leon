@@ -51,10 +51,10 @@ object XlangAnalysisPhase extends LeonPhase[Program, VerificationReport] {
     }
 
     val vr = AnalysisPhase.run(ctx.copy(options = newOptions))(pgm4)
-    completeVerificationReport(vr, functionWasLoop _)
+    completeVerificationReport(pgm, vr, functionWasLoop _)
   }
 
-  def completeVerificationReport(vr: VerificationReport, functionWasLoop: FunDef => Boolean): VerificationReport = {
+  def completeVerificationReport(pgm : Program, vr: VerificationReport, functionWasLoop: FunDef => Boolean): VerificationReport = {
     val vcs = vr.conditions
 
     //this is enough to convert invariant postcondition and inductive conditions. However the initial validity
@@ -82,7 +82,7 @@ object XlangAnalysisPhase extends LeonPhase[Program, VerificationReport] {
       }
     }
 
-    new VerificationReport(freshFtoVcs)
+    new VerificationReport(pgm, freshFtoVcs)
   }
 
 }

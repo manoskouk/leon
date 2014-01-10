@@ -60,7 +60,7 @@ object AnalysisPhase extends LeonPhase[Program,VerificationReport] {
     allVCs
   }
 
-  def checkVerificationConditions(vctx: VerificationContext, vcs: Map[FunDef, List[VerificationCondition]]) : VerificationReport = {
+  def checkVerificationConditions(p: Program, vctx: VerificationContext, vcs: Map[FunDef, List[VerificationCondition]]) : VerificationReport = {
     val reporter = vctx.reporter
     val solvers  = vctx.solvers
 
@@ -132,9 +132,7 @@ object AnalysisPhase extends LeonPhase[Program,VerificationReport] {
           case _ =>
         }
     }
-
-    val report = new VerificationReport(vcs)
-    report
+    new VerificationReport(p, vcs)
   }
 
   def run(ctx: LeonContext)(program: Program) : VerificationReport = {
@@ -153,6 +151,7 @@ object AnalysisPhase extends LeonPhase[Program,VerificationReport] {
 
     val reporter = ctx.reporter
 
+    reporter.debug("Timeout is " + timeout.toString)
     val baseFactories = Seq(
       SolverFactory(() => new FairZ3Solver(ctx, program))
     )
@@ -170,6 +169,6 @@ object AnalysisPhase extends LeonPhase[Program,VerificationReport] {
 
     reporter.debug("Running verification condition generation...")
     val vcs = generateVerificationConditions(reporter, program, functionsToAnalyse)
-    checkVerificationConditions(vctx, vcs)
+    checkVerificationConditions(program, vctx, vcs)
   }
 }

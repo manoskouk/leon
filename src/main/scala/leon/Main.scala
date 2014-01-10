@@ -33,13 +33,14 @@ object Main {
       LeonFlagOptionDef ("xlang",       "--xlang",              "Support for extra program constructs (imperative,...)"),
       LeonValueOptionDef("debug",       "--debug=<sections..>", "Enables specific messages"),
       LeonValueOptionDef("memo" ,       "--memo=<output file>", "Memoization transformation"),
+      LeonFlagOptionDef ("no-verify",   "--no-verify",          "Skip verification before memoization transformation."),
       LeonFlagOptionDef ("help",        "--help",               "Show help")
     )
 
   lazy val allOptions = allComponents.flatMap(_.definedOptions) ++ topLevelOptions
 
   def displayHelp(reporter: Reporter) {
-    reporter.info("usage: leon [--xlang] [--termination] [--synthesis] [--memo] [--help] [--debug=<N>] [..] <files>")
+    reporter.info("usage: leon [--xlang] [--termination] [--synthesis] [--memo=<file>] [--help] [--debug=<N>] [..] <files>")
     reporter.info("")
     for (opt <- topLevelOptions.toSeq.sortBy(_.name)) {
       reporter.info("%-20s %s".format(opt.usageOption, opt.usageDesc))
@@ -147,6 +148,8 @@ object Main {
           settings = settings.copy(memo = "memo.out")
         else 
           settings = settings.copy(memo = value)
+      case LeonFlagOption("no-verify", value) =>
+        settings = settings.copy(verify = !value)
       case LeonValueOption("debug", ListValue(sections)) =>
         val debugSections = sections.flatMap { s =>
           if (s == "all") {
@@ -204,7 +207,18 @@ object Main {
       } else if (settings.xlang) {
         xlang.XlangAnalysisPhase
       } else if (settings.memo != "") {
-        memoization.MemoizationPhase
+        if (settings.verify) {
+          verification.AnalysisPhase andThen memoization.MemoizationPhase
+        }
+        else {
+          import verification.VerificationReport
+          new LeonPhase[Program,VerificationReport] { 
+            val description = ""
+            val name = ""
+            def run(ctx : LeonContext)(p : Program ) : VerificationReport = 
+              VerificationReport.emptyReport(p)
+          } andThen memoization.MemoizationPhase
+        }
       } else if (settings.verify) {
         verification.AnalysisPhase
       } else {

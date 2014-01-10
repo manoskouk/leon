@@ -193,6 +193,7 @@ trait CodeExtraction extends ASTExtractors {
               case "leon.Annotations.induct"     => funDef.addAnnotation("induct")
               case "leon.Annotations.axiomatize" => funDef.addAnnotation("axiomatize")
               case "leon.Annotations.main"       => funDef.addAnnotation("main")
+              case "leon.Annotations.forceMemo"  => funDef.addAnnotation("forceMemo")
               case _ => ;
             }
           }

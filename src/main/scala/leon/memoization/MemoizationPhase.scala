@@ -8,8 +8,10 @@ import purescala.TypeTrees._
 import purescala.TreeOps._
 import purescala.Trees._
 import purescala.Common._
+import verification.VerificationReport
+import verification.VerificationCondition
 
-object MemoizationPhase extends TransformationPhase {
+object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
   val name = "Memoization transformation"
   val description = "Transform a program into another, " + 
     "where data stuctures keep Memoization information"
@@ -22,23 +24,33 @@ object MemoizationPhase extends TransformationPhase {
 
   abstract class MemoClassRecord[+A <: ClassTypeDef](
     val p : Program,
+    val candidateFuns : Set[FunDef],
     val classDef : A,
     val parent : Option[MemoClassRecord[AbstractClassDef]] 
   ) {
     
     // Functions which recursively call themselves with their only argument being of type classDef
-    val classDefRecursiveFuns : List[FunDef] = p.definedFunctions.toList filter { f => 
-      p.transitivelyCalls(f,f) &&
-      f.args.size == 1 &&
-      f.args.head.getType.isInstanceOf[ClassType] &&
+    val classDefRecursiveFuns : List[FunDef] = { candidateFuns filter { f =>// p.definedFunctions.toList filter { f => 
       f.args.head.getType.asInstanceOf[ClassType].classDef == classDef &&
-      (
+      ( 
+        // TODO : clear out what happens in these cases.   
         if (f.returnType.isInstanceOf[ClassType]) { 
           f.returnType.asInstanceOf[ClassType].classDef.hierarchyRoot != classDef.hierarchyRoot 
         }
         else true 
-      )  // TODO : clear out what happens in these cases. 
-    } 
+      ) /*&&
+      // skip proven functions
+      ( 
+        if (candidateFuns contains f) true 
+        else {
+          ctx.reporter.debug("Not memoizing function " + f.id.name + 
+            " for type " + classDef.id.name + 
+            "\nbecause we don't need it to monitor unproven VCs."
+          )
+          false 
+        }
+      )*/   
+    }}.toList
     val hasLocalMemoFuns = !classDefRecursiveFuns.isEmpty
     
     // Extra fields we are adding to the type. None if there is nothing to add
@@ -217,9 +229,10 @@ object MemoizationPhase extends TransformationPhase {
 
   class MemoCaseClassRecord (
     p : Program,
+    candidateFuns : Set[FunDef],
     classDef : CaseClassDef, 
     parent : Option[MemoClassRecord[AbstractClassDef]] 
-  ) extends MemoClassRecord[CaseClassDef](p,classDef,parent) {
+  ) extends MemoClassRecord[CaseClassDef](p,candidateFuns,classDef,parent) {
     
     val children: List[MemoClassRecord[CaseClassDef]] = Nil
 
@@ -521,40 +534,55 @@ object MemoizationPhase extends TransformationPhase {
 
   class MemoAbstractClassRecord (
     p : Program,
+    candidateFuns : Set[FunDef],
     classDef : AbstractClassDef, 
     parent : Option[MemoClassRecord[AbstractClassDef]] 
-  ) extends MemoClassRecord[AbstractClassDef](p,classDef,parent) {
+  ) extends MemoClassRecord[AbstractClassDef](p,candidateFuns,classDef,parent) {
     
     val constructor: Option[FunDef] = None
     
     // recursive! 
     val children : List[MemoClassRecord[ClassTypeDef]] = 
-      classDef.knownChildren.toList map { cd => MemoClassRecord(p, cd, this) }
+      classDef.knownChildren.toList map { cd => MemoClassRecord(p, candidateFuns, cd, this) }
 
     def enrichClassDef = { } 
   }
 
 
   object MemoClassRecord {
-    def apply(p: Program, classDef : ClassTypeDef) : MemoClassRecord[ClassTypeDef] = classDef match {
+    def apply(
+      p: Program, 
+      candidateFuns: Set[FunDef], 
+      classDef : ClassTypeDef
+    ) : MemoClassRecord[ClassTypeDef] = classDef match {
       case ab : AbstractClassDef => 
-        new MemoAbstractClassRecord(p, ab, None)
+        new MemoAbstractClassRecord(p, candidateFuns, ab, None)
       case cc : CaseClassDef =>
-        new MemoCaseClassRecord(p, cc, None)
+        new MemoCaseClassRecord(p, candidateFuns, cc, None)
     }
 
-    def apply(p: Program, classDef : ClassTypeDef, parent : MemoAbstractClassRecord) : MemoClassRecord[ClassTypeDef] = classDef match {
+    def apply(
+      p: Program, 
+      candidateFuns: Set[FunDef], 
+      classDef : ClassTypeDef, 
+      parent : MemoAbstractClassRecord
+    ) : MemoClassRecord[ClassTypeDef] = classDef match {
       case ab : AbstractClassDef => 
-        new MemoAbstractClassRecord(p, ab, Some(parent))
+        new MemoAbstractClassRecord(p, candidateFuns, ab, Some(parent))
       case cc : CaseClassDef =>
-        new MemoCaseClassRecord(p, cc, Some(parent))
+        new MemoCaseClassRecord(p, candidateFuns, cc, Some(parent))
     }
 
-    def apply(p: Program, classDef : ClassTypeDef, parent : Option[MemoAbstractClassRecord]) : MemoClassRecord[ClassTypeDef] = classDef match {
+    def apply(
+      p: Program, 
+      candidateFuns: Set[FunDef], 
+      classDef : ClassTypeDef, 
+      parent : Option[MemoAbstractClassRecord]
+    ) : MemoClassRecord[ClassTypeDef] = classDef match {
       case ab : AbstractClassDef => 
-        new MemoAbstractClassRecord(p, ab, parent)
+        new MemoAbstractClassRecord(p, candidateFuns, ab, parent)
       case cc : CaseClassDef =>
-        new MemoCaseClassRecord(p, cc, parent)
+        new MemoCaseClassRecord(p, candidateFuns, cc, parent)
     }
 
   }
@@ -648,19 +676,47 @@ object MemoizationPhase extends TransformationPhase {
     newFun
   }
 
+  // Find which functions (may) need to get memoized
+  def findCandidateFuns(vRep : VerificationReport) : Set[FunDef]= {
+    val p = vRep.program
+    val referredFuns : Set[FunDef] = if (vRep.fvcs.isEmpty) p.definedFunctions.toSet else {
+      // Find all functions that are referred to from unproven conditions
+      val convert: Expr => Set[FunDef] = (_ => Set.empty)
+      val combine: (Set[FunDef],Set[FunDef]) => Set[FunDef] = (s1, s2) => s1 ++ s2
+      def compute(e: Expr, funs: Set[FunDef]) :  Set[FunDef] = e match {
+        case FunctionInvocation(f2, _) => funs + f2
+        case _ => funs
+      }
 
+      val funSets = vRep.conditions filter { 
+        _.value != Some(true) 
+      } map { 
+        cond:VerificationCondition => treeCatamorphism(convert, combine, compute, cond.condition) 
+      }
+      // The tans. closure of functions that are called from VCs 
+      (funSets.toSet.flatten flatMap p.transitiveCallees) ++
+      // ... and add the functions the user has annotated with forceMemo
+      p.definedFunctions filter { fun => fun.annotations.contains("forceMemo") } 
+    
+    }
 
-  def apply (ctx: LeonContext, originalP : Program) = {
+    // Filter these to have the desired form
+    referredFuns filter { f =>  
+      f.args.size == 1 &&
+      f.args.head.getType.isInstanceOf[ClassType] &&
+      p.transitivelyCalls(f,f) 
+    }
 
+  }
+  
+  override def run(ctx: LeonContext)(vRep: VerificationReport) = {
 
+    val p = vRep.program
     this.ctx = ctx
-    ctx.reporter.info("Applying memoization transformation on object " + originalP.mainObject.id.name)
-      
-    // Duplicate the original program to keep the old tree too
-    val p = originalP.duplicate
-
-
-    val defTrees = p.classHierarchyRoots.toList map { cd => MemoClassRecord(p, cd) }  
+    ctx.reporter.info("Applying memoization transformation on object " + p.mainObject.id.name)
+    
+    val candidateFuns =   findCandidateFuns(vRep)
+    val defTrees = p.classHierarchyRoots.toList map { cd => MemoClassRecord(p, candidateFuns , cd) }  
     
     // Map of (oldFun -> newFun). Will contain only funs that are memoized
     val memoFunsMap = defTrees.flatMap { _.collectFromTree( 

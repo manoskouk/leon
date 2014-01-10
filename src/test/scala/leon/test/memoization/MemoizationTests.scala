@@ -15,6 +15,7 @@ import memoization._
 import leon.evaluators._
 import leon.evaluators.CodeGenEvaluator._
 import leon.evaluators.EvaluationResults._
+import leon.codegen.CodeGenParams
 
 import org.scalatest.matchers.ShouldMatchers._
 
@@ -190,7 +191,7 @@ class MemoizationSuite extends LeonTestSuite {
   val testFilePath   = "regression/memoization/tests"
 
   //val testSizes = Seq(10,1000, 2500, 10000, 20000)
-  val testSizes = Seq(10, 250)// 100000, 10000000)
+  val testSizes = Seq(10, 20, 100)
 
   private def testMemo(f : File) { 
     val outFile  = new File ( 
@@ -209,25 +210,34 @@ class MemoizationSuite extends LeonTestSuite {
       )
 
       ctx.reporter.info("Transforming " + f.getAbsolutePath)
-
-      val transAST = (pipeFront andThen MemoizationPhase).run(
-        ctx.copy(settings = Settings(memo =  outFile.getAbsolutePath))
-      )(f.getAbsolutePath :: Nil)
+      val transAST = { 
+        import verification.VerificationReport
+        val interm = new LeonPhase[Program,VerificationReport] { 
+          val description = ""
+          val name = ""
+          def run(ctx : LeonContext)(p : Program ) : VerificationReport = 
+            VerificationReport.emptyReport(p)
+        } 
+        (pipeFront andThen interm andThen MemoizationPhase).run(
+          ctx.copy(settings = Settings(memo =  outFile.getAbsolutePath))
+        )(f.getAbsolutePath :: Nil)
+      }
       
       ctx.reporter.info("Recompiling original " + f.getName)
       
       val origAST = pipeFront.run(ctx)(f.getAbsolutePath :: Nil) 
       
       //this is not ideal, but the normal way has bugs  :(
-      ctx.reporter.info( "Recompiling transformed")
+      //ctx.reporter.info( "Recompiling transformed")
 
-      val transAST2 = pipeFront.run(ctx)(outFile.getAbsolutePath :: Nil) 
-
+      //val transAST2 = pipeFront.run(ctx)(outFile.getAbsolutePath :: Nil) 
+      val transAST2 = transAST
       
       def compileTestFun(p : Program) : (Expr, (Expr, Int) => EvaluationResults.Result) = { 
         //ctx.reporter.info(PrettyPrinter(p))
         //ctx.reporter.info("Defined functions: " + (p.definedFunctions filter { _.hasImplementation } map (_.id.name) mkString(", ")))
-        val evaluator = new CodeGenEvaluator(ctx, p)
+        // We want to produce code that checks contracts
+        val evaluator = new CodeGenEvaluator(ctx, p) //, CodeGenParams(checkContracts = true))
         val testFun =  p.definedFunctions.find(_.id.name == "test").getOrElse {
           ctx.reporter.fatalError("Test function not defined!")
         }

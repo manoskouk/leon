@@ -191,7 +191,7 @@ class MemoizationSuite extends LeonTestSuite {
   val testFilePath   = "regression/memoization/tests"
 
   //val testSizes = Seq(10,1000, 2500, 10000, 20000)
-  val testSizes = Seq(10, 20, 100)
+  val testSizes = Seq(100, 1000, 2000)
 
   private def testMemo(f : File) { 
     val outFile  = new File ( 
@@ -237,7 +237,7 @@ class MemoizationSuite extends LeonTestSuite {
         //ctx.reporter.info(PrettyPrinter(p))
         //ctx.reporter.info("Defined functions: " + (p.definedFunctions filter { _.hasImplementation } map (_.id.name) mkString(", ")))
         // We want to produce code that checks contracts
-        val evaluator = new CodeGenEvaluator(ctx, p) //, CodeGenParams(checkContracts = true))
+        val evaluator = new CodeGenEvaluator(ctx, p , CodeGenParams(checkContracts = true))
         val testFun =  p.definedFunctions.find(_.id.name == "test").getOrElse {
           ctx.reporter.fatalError("Test function not defined!")
         }

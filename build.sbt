@@ -37,9 +37,9 @@ logBuffered in Test := false
 
 testOptions in Test += Tests.Argument("-oD")
 
-javaOptions in test += "-Xss32M"
-
 parallelExecution in Test := false
+
+javaOptions in (Test, run) += "-Xss128m"
 
 sourcesInBase in Compile := false
 

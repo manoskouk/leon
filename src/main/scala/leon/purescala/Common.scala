@@ -25,7 +25,7 @@ object Common {
 
     override def toString: String = {
       if(alwaysShowUniqueID) {
-        name + (if(id > 0) id else "")
+        name + (if(id > 0) "__" + id else "")
       } else {
         name
       }

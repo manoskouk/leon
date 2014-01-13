@@ -8,7 +8,7 @@ case class Settings(
   val termination: Boolean             = false,
   val synthesis: Boolean               = false,
   val xlang: Boolean                   = false,
-  val memo : String                    = "",    // Output file for memoization
+  val memo : Boolean                   = false, 
   val verify: Boolean                  = true,
   val classPath: List[String]          = Settings.defaultClassPath()
 )

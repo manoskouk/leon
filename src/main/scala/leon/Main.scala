@@ -33,15 +33,14 @@ object Main {
       LeonFlagOptionDef ("xlang",       "--xlang",              "Support for extra program constructs (imperative,...)"),
       LeonFlagOptionDef ("library",     "--library",            "Inject Leon standard library"),
       LeonValueOptionDef("debug",       "--debug=<sections..>", "Enables specific messages"),
-      LeonValueOptionDef("memo" ,       "--memo=<output file>", "Memoization transformation"),
-      LeonFlagOptionDef ("no-verify",   "--no-verify",          "Skip verification before memoization transformation."),
+      LeonFlagOptionDef ("memo" ,       "--memo",               "Memoization transformation"),
       LeonFlagOptionDef ("help",        "--help",               "Show help")
     )
 
   lazy val allOptions = allComponents.flatMap(_.definedOptions) ++ topLevelOptions
 
   def displayHelp(reporter: Reporter) {
-    reporter.info("usage: leon [--xlang] [--termination] [--synthesis] [--memo=<file>] [--help] [--debug=<N>] [..] <files>")
+    reporter.info("usage: leon [--xlang] [--termination] [--synthesis] [--memo] [--help] [--debug=<N>] [..] <files>")
     reporter.info("")
     for (opt <- topLevelOptions.toSeq.sortBy(_.name)) {
       reporter.info("%-20s %s".format(opt.usageOption, opt.usageDesc))
@@ -144,11 +143,9 @@ object Main {
         settings = settings.copy(injectLibrary = value)
       case LeonFlagOption("xlang", value) =>
         settings = settings.copy(xlang = value)
-      case LeonValueOption("memo", value) =>
-        if (value forall {_.isWhitespace}) 
-          settings = settings.copy(memo = "memo.out")
-        else 
-          settings = settings.copy(memo = value)
+      case LeonFlagOption("memo", value) =>
+        settings = settings.copy(memo  = value)
+      // FIXME is this the correct place to put it? 
       case LeonFlagOption("no-verify", value) =>
         settings = settings.copy(verify = !value)
       case LeonValueOption("debug", ListValue(sections)) =>
@@ -211,11 +208,12 @@ object Main {
         termination.TerminationPhase
       } else if (settings.xlang) {
         xlang.XlangAnalysisPhase
-      } else if (settings.memo != "") {
+      } else if (settings.memo) {
         if (settings.verify) {
           verification.AnalysisPhase andThen memoization.MemoizationPhase
         }
         else {
+          // If --no-verify is selected, pass an empty verification report
           import verification.VerificationReport
           new LeonPhase[Program,VerificationReport] { 
             val description = ""

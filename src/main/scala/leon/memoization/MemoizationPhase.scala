@@ -12,9 +12,14 @@ import verification.VerificationReport
 import verification.VerificationCondition
 
 object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
+
   val name = "Memoization transformation"
   val description = "Transform a program into another, " + 
     "where data stuctures keep Memoization information"
+  override val definedOptions : Set[LeonOptionDef] = Set( 
+    LeonFlagOptionDef("no-verify", "--no-verify", "Skip verification before memoization transformation."),
+    LeonValueOptionDef("o",        "--o=<file>",  "Output file for memoization transformation.") 
+  )
 
   // Reporting
   private implicit val debugSection = DebugSectionMemoization
@@ -721,6 +726,14 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
 
     val p = vRep.program
     this.ctx = ctx
+
+    var outputFile : String = "memo.out.scala" 
+    for (opt <- ctx.options) opt match {
+      case LeonValueOption("o", file) =>
+        outputFile = file 
+      case _ => 
+    }
+
     ctx.reporter.info("Applying memoization transformation on object " + p.mainObject.id.name)
     
     val candidateFuns =   findCandidateFuns(vRep)
@@ -775,7 +788,7 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
         searchAndReplace(replaceConstructors(constructorMap))
     ))
 
-    newProg.writeScalaFile(ctx.settings.memo)
+    newProg.writeScalaFile(outputFile)
 
     newProg
 

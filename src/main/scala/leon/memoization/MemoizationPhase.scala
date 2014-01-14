@@ -28,7 +28,7 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
   
 
   // Identifier printing strategy 
-  private val alwaysShowUniqueId = true
+  private val alwaysShowUniqueId = false 
   private def freshIdentifier (name : String) = FreshIdentifier(name, alwaysShowUniqueId)
 
   abstract class MemoClassRecord[+A <: ClassTypeDef](
@@ -692,7 +692,10 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
   // Find which functions (may) need to get memoized
   def findCandidateFuns(vRep : VerificationReport) : Set[FunDef]= {
     val p = vRep.program
-    val referredFuns : Set[FunDef] = if (vRep.fvcs.isEmpty) p.definedFunctions.toSet else {
+    val referredFuns : Set[FunDef] = if (vRep.fvcs.isEmpty) {
+      dbg("EMPTY REPORT")
+      p.definedFunctions.toSet 
+    } else {
       // Find all functions that are referred to from unproven conditions
       val convert: Expr => Set[FunDef] = (_ => Set.empty)
       val combine: (Set[FunDef],Set[FunDef]) => Set[FunDef] = (s1, s2) => s1 ++ s2
@@ -701,31 +704,43 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
         case _ => funs
       }
 
+      //dbg("I have these unproven conditions\n" + vRep.conditions.filter { _.value!= Some(true) }. map {_.condition}.mkString("\n"))
+      dbg("I have these conditions\n" + vRep.conditions. map {_.condition}.mkString("\n"))
       val funSets = vRep.conditions filter { 
         _.value != Some(true) 
       } map { 
         cond:VerificationCondition => treeCatamorphism(convert, combine, compute, cond.condition) 
       }
-      // The tans. closure of functions that are called from VCs 
-      (funSets.toSet.flatten flatMap p.transitiveCallees) ++
+      dbg("Referred functions:\n " + funSets.toSet.flatten.map{_.id.name}.mkString("\n"))
+      val toRet1 = funSets.toSet.flatten flatMap p.transitiveCallees
+
+      dbg("Transitive callees:\n " + toRet1.map{_.id.name}.mkString("\n"))
+      // The trans. closure of functions that are called from VCs 
+      val toRet = (toRet1) ++ funSets.toSet.flatten ++ 
       // ... and add the functions the user has annotated with forceMemo
-      p.definedFunctions filter { fun => fun.annotations.contains("forceMemo") } 
+      (p.definedFunctions filter { fun => fun.annotations.contains("forceMemo") } ).toSet
+      dbg("I found these candidates:\n" + toRet.map {_.id.name}.mkString("\n"))
+      toRet
     
     }
 
     // Filter these to have the desired form
-    referredFuns filter { f =>  
+    val toRet = referredFuns filter { f =>  
       f.args.size == 1 &&
       f.args.head.getType.isInstanceOf[ClassType] &&
       p.transitivelyCalls(f,f) 
     }
 
+    dbg("I found these final candidates:\n" + toRet.map {_.id.name}.mkString("\n"))
+    toRet 
   }
   
   override def run(ctx: LeonContext)(vRep: VerificationReport) = {
 
     val p = vRep.program
     this.ctx = ctx
+
+    dbg(vRep.summaryString)
 
     var outputFile : String = "memo.out.scala" 
     for (opt <- ctx.options) opt match {

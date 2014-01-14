@@ -18,9 +18,11 @@ object Main {
       synthesis.SynthesisPhase,
       termination.TerminationPhase,
       verification.AnalysisPhase,
+      memoization.ExcludeVerifiedPhase,
       memoization.MemoizationPhase
     )
   }
+
 
   // Add whatever you need here.
   lazy val allComponents : Set[LeonComponent] = allPhases.toSet ++ Set(
@@ -210,17 +212,18 @@ object Main {
         xlang.XlangAnalysisPhase
       } else if (settings.memo) {
         if (settings.verify) {
-          verification.AnalysisPhase andThen memoization.MemoizationPhase
+          verification.AnalysisPhase andThen memoization.ExcludeVerifiedPhase andThen memoization.MemoizationPhase
         }
         else {
-          // If --no-verify is selected, pass an empty verification report
+          /*// If --no-verify is selected, pass an empty verification report
           import verification.VerificationReport
           new LeonPhase[Program,VerificationReport] { 
             val description = ""
             val name = ""
             def run(ctx : LeonContext)(p : Program ) : VerificationReport = 
               VerificationReport.emptyReport(p)
-          } andThen memoization.MemoizationPhase
+          } andThen memoization.MemoizationPhase */
+          memoization.MemoizationPhase
         }
       } else if (settings.verify) {
         verification.AnalysisPhase

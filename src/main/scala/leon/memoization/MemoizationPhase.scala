@@ -11,7 +11,7 @@ import purescala.Common._
 import verification.VerificationReport
 import verification.VerificationCondition
 
-object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
+object MemoizationPhase extends TransformationPhase {
 
   val name = "Memoization transformation"
   val description = "Transform a program into another, " + 
@@ -688,7 +688,7 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
     newFun.postcondition = fn.postcondition map { case (id, ex) => (id, sar(ex)) }
     newFun
   }
-
+/*
   // Find which functions (may) need to get memoized
   def findCandidateFuns(vRep : VerificationReport) : Set[FunDef]= {
     val p = vRep.program
@@ -733,14 +733,55 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
 
     dbg("I found these final candidates:\n" + toRet.map {_.id.name}.mkString("\n"))
     toRet 
-  }
-  
-  override def run(ctx: LeonContext)(vRep: VerificationReport) = {
+  } */
 
-    val p = vRep.program
+
+  // Find which functions (may) need to get memoized
+  def findCandidateFuns(p: Program) : Set[FunDef]= {
+    // Find all functions that are referred to from unproven conditions
+    val convert: Expr => Set[FunDef] = (_ => Set.empty)
+    val combine: (Set[FunDef],Set[FunDef]) => Set[FunDef] = (s1, s2) => s1 ++ s2
+    def compute(e: Expr, funs: Set[FunDef]) :  Set[FunDef] = e match {
+      case FunctionInvocation(f2, _) => funs + f2
+      case _ => funs
+    }
+
+    val unprovenCons = p.definedFunctions.flatMap( fn => fn.precondition.toSeq ++ fn.postcondition.toSeq.map {_._2})
+    dbg("I have these conditions\n" + unprovenCons.mkString("\n"))
+    
+    val referredFuns = (unprovenCons flatMap { expr => treeCatamorphism(convert,combine,compute,expr) }).toSet
+    dbg("Referred functions:\n" + referredFuns.map{_.id.name}.mkString("\n"))
+    
+    val transCalles = referredFuns flatMap p.transitiveCallees
+    dbg("Transitive callees:\n" + transCalles.map{_.id.name}.mkString("\n"))
+
+    // The trans. closure of functions that are called from VCs 
+    val allCandidates = transCalles ++ referredFuns ++  
+      // ... and add the functions the user has annotated with forceMemo
+      (p.definedFunctions filter { _.annotations.contains("forceMemo") } ).toSet
+    dbg("I found these candidates:\n" + allCandidates.map {_.id.name}.mkString("\n"))
+    
+    // Filter these to have the desired form
+    val toRet = allCandidates filter { f =>  
+      f.args.size == 1 &&
+      f.args.head.getType.isInstanceOf[ClassType] &&
+      p.transitivelyCalls(f,f) 
+    }
+    dbg("I found these final candidates:\n" + toRet.map {_.id.name}.mkString("\n"))
+    
+    toRet 
+  }
+
+  def apply(ctx: LeonContext, p : Program) : Program  = {
+  /*  run(ctx)(p)
+  }
+
+  override def run(ctx: LeonContext)(p : Program) : Program = { //vRep: VerificationReport) = {
+*/
+    //val p = vRep.program
     this.ctx = ctx
 
-    dbg(vRep.summaryString)
+    //dbg(vRep.summaryString)
 
     var outputFile : String = "memo.out.scala" 
     for (opt <- ctx.options) opt match {
@@ -751,7 +792,7 @@ object MemoizationPhase extends LeonPhase[VerificationReport, Program] {
 
     ctx.reporter.info("Applying memoization transformation on object " + p.mainObject.id.name)
     
-    val candidateFuns =   findCandidateFuns(vRep)
+    val candidateFuns =   findCandidateFuns(p) //vRep)
     val defTrees = p.classHierarchyRoots.toList map { cd => MemoClassRecord(p, candidateFuns , cd) }  
     
     // Map of (oldFun -> newFun). Will contain only funs that are memoized

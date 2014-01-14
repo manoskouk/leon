@@ -27,6 +27,7 @@ class DefaultTactic(reporter: Reporter) extends Tactic(reporter) {
 
     def generatePostconditions(functionDefinition: FunDef) : Seq[VerificationCondition] = {
       assert(functionDefinition.body.isDefined)
+      implicit val debugSeq = DebugSectionVerification
       val prec = functionDefinition.precondition
       val optPost = functionDefinition.postcondition
       val body = matchToIfThenElse(functionDefinition.body.get)
@@ -36,19 +37,34 @@ class DefaultTactic(reporter: Reporter) extends Tactic(reporter) {
           Seq()
 
         case Some((id, post)) =>
-          val theExpr = { 
-            val resFresh = FreshIdentifier("result", true).setType(body.getType)
-            val bodyAndPost = Let(resFresh, body, replace(Map(Variable(id) -> Variable(resFresh)), matchToIfThenElse(post)))
+          def oneCondition (post : Expr) : VerificationCondition = {
+            val theExpr = { 
+              val resFresh = FreshIdentifier("result", true).setType(body.getType)
+              val bodyAndPost = Let(resFresh, body, replace(Map(Variable(id) -> Variable(resFresh)), matchToIfThenElse(post)))
+              /*implicit val debugSec = DebugSectionVerification
+              reporter.debug(post match {
+                case And(args) => "AND with " + args.length + " args\n"
+                case _ => "Not an AND\n"
+              })
+              reporter.debug(post.toString)*/
+              val withPrec = if(prec.isEmpty) {
+                bodyAndPost
+              } else {
+                Implies(matchToIfThenElse(prec.get), bodyAndPost)
+              }
 
-            val withPrec = if(prec.isEmpty) {
-              bodyAndPost
-            } else {
-              Implies(matchToIfThenElse(prec.get), bodyAndPost)
+              withPrec
             }
-
-            withPrec
+            //reporter.debug("The final conditon is: \n" + purescala.ScalaPrinter(theExpr))
+            new VerificationCondition(theExpr, functionDefinition, VCKind.Postcondition, this)
           }
-          Seq(new VerificationCondition(theExpr, functionDefinition, VCKind.Postcondition, this).setPos(post))
+
+          val exprs = post match { 
+            case And(args) => args
+            case _ => Seq(post)
+          }
+          reporter.debug("Function " + functionDefinition.id.name + " produced " + exprs.length + " postconditions.")
+          exprs map oneCondition
       }
     }
   

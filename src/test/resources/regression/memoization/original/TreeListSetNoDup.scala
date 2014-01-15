@@ -2,6 +2,8 @@ import scala.collection.immutable.Set
 import leon.Annotations._
 import leon.Utils._
 
+// Problem with content
+
 object BinaryTree {
   // list of integers
   sealed abstract class List

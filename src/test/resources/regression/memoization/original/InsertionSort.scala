@@ -1,4 +1,4 @@
-import scala.collection.immutable.Set
+import leon.Annotations._ //import scala.collection.immutable.Set
 import leon.Utils._
 
 object InsertionSort {
@@ -14,12 +14,12 @@ object InsertionSort {
     case Nil() => 0
     case Cons(_, xs) => 1 + size(xs)
   }) ensuring(_ >= 0)
-/*
+
   def contents(l: List): Set[Int] = l match {
     case Nil() => Set.empty
     case Cons(x,xs) => contents(xs) ++ Set(x)
   }
-*/
+
   def min(l : List) : OptInt = l match {
     case Nil() => None()
     case Cons(x, xs) => min(xs) match {
@@ -28,16 +28,16 @@ object InsertionSort {
     }
   }
 
-  def minProp0(l : List) : Boolean = (l match {
+  def minProp0(l : List) : Boolean = { l match {
     case Nil() => true
     case c @ Cons(x, xs) => min(c) match {
       case None() => false
       case Some(m) => x >= m
     }
-  }) holds
+  }} holds
 
   def minProp1(l : List) : Boolean = {
-    require(isSorted(l) && size(l) <= 5)
+    require(isSorted(l)) // && size(l) <= 5)
     l match {
       case Nil() => true
       case c @ Cons(x, xs) => min(c) match {
@@ -54,19 +54,19 @@ object InsertionSort {
   }
 
   def sortedIns(e: Int, l: List): List = {
-    require(isSorted(l) && size(l) <= 5)
+    require(isSorted(l)) //  && size(l) <= 5)
     l match {
       case Nil() => Cons(e,Nil())
       case Cons(x,xs) => if (x <= e) Cons(x,sortedIns(e, xs)) else Cons(e, l)
     }
-  } ensuring(res => //contents(res) == contents(l) ++ Set(e) && 
+  } ensuring(res => contents(res) == contents(l) ++ Set(e) && 
     isSorted(res)
   )
 
   def sort(l: List): List = (l match {
     case Nil() => Nil()
     case Cons(x,xs) => sortedIns(x, sort(xs))
-  }) ensuring(res =>// contents(res) == contents(l) && 
+  }) ensuring(res => contents(res) == contents(l) && 
     isSorted(res)
   )
 /*

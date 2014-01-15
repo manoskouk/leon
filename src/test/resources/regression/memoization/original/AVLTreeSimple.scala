@@ -5,7 +5,7 @@
  **/
 
 import leon.Utils._
-import leon.Annotations._ 
+import leon.Annotations._
 
 object AVLTree  {
   sealed abstract class Tree
@@ -45,13 +45,13 @@ object AVLTree  {
   def min(i1:Int, i2:Int) : Int = if (i1<=i2) i1 else i2
   def max(i1:Int, i2:Int) : Int = if (i1>=i2) i1 else i2
 
-  private def size(t: Tree): Int = {
+  def size(t: Tree): Int = {
     (t match {
       case Leaf() => 0
       case Node(l, _, r) => size(l) + 1 + size(r)
     })
   } ensuring (_ >= 0)
-  
+ 
   @forceMemo
   def height(t: Tree): Int = {
     t match {
@@ -78,12 +78,7 @@ object AVLTree  {
     }
   }
 
- 
-  def content(t : Tree) : Set[Int] = t match {
-    case Leaf() => Set.empty[Int]
-    case Node(l,v,r) => content(l) ++ Set[Int](v) ++ content(r)
-  }
-
+  
   def isBST(t:Tree) : Boolean = {
     t match {
       case Leaf() => true
@@ -107,10 +102,7 @@ object AVLTree  {
   def isAVL(t:Tree) : Boolean = {    
     t match {
         case Leaf() => true        
-        case Node(l,v,r) =>  
-          isAVL(l) && isAVL(r) && 
-          smallerOption(treeMax(l),Some(v)) && smallerOption(Some(v),treeMin(r)) &&
-          balanceFactor(t) >= -1 && balanceFactor(t) <= 1 
+        case Node(l,_,r) =>  isAVL(l) && isAVL(r) && balanceFactor(t) >= -1 && balanceFactor(t) <= 1 
       }    
   } 
 
@@ -135,14 +127,10 @@ object AVLTree  {
   def offByOne(t : Tree) : Boolean = {
     t match {
       case Leaf() => true
-      case Node(l,v,r) => 
-        isAVL(l) && isAVL(r) && 
-        balanceFactor(t) >= -2 && balanceFactor(t) <= 2 &&
-        smallerOption(treeMax(l),Some(v)) && smallerOption(Some(v),treeMin(r)) 
+      case Node(l,_,r) => isAVL(l) && isAVL(r) && balanceFactor(t) >= -2 && balanceFactor(t) <= 2 
     }
   }
  
-  @induct
   def unbalancedInsert(t: Tree, e : Int) : Tree = {
     require(isAVL(t))
     t match {
@@ -158,20 +146,14 @@ object AVLTree  {
           Node(l, v, newr)
         }            
     }
-  } ensuring(res => offByOne(res) && content(res) == content(t) ++ Set[Int](e))
+  } 
                     
   def avlInsert(t: Tree, e : Int) : Tree = {    
     require(isAVL(t))
     
     balance(unbalancedInsert(t,e))
     
-  } ensuring(res => 
-    isAVL(res) && 
-    height(res) >= height(t) && 
-    height(res) <= height(t) + 1 && 
-    size(res) <= size(t) + 1 &&
-    content(res) == content(t) ++ Set[Int](e)
-  )
+  } ensuring(res => isAVL(res) && height(res) >= height(t) && height(res) <= height(t) + 1 && size(res) <= size(t) + 1)
      
   def balance(t:Tree) : Tree = {
     require(offByOne(t)) //isBST(t) && 
@@ -188,7 +170,7 @@ object AVLTree  {
             else l
           rotateRight(Node(newL,v,r))
         }
-        else if(bfactor < -1) { //right-heavy
+        else if(bfactor < -1) {
           val newR = 
             if (balanceFactor(r) > 0) { // r is left heavy
               rotateRight(r)
@@ -197,7 +179,7 @@ object AVLTree  {
           rotateLeft(Node(l,v,newR))
         } else t        
       } 
-    } ensuring(res => isAVL(res) && content(res) == content(t))
+  } ensuring(isAVL(_))
 
   def rotateRight(t:Tree) = {    
     t match {

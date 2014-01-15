@@ -57,7 +57,7 @@ object BinarySearchTree {
         Node(l, v, r)
       })
     }
-  } ensuring(res => isBST(res))// && content(res) == content(tree) ++ Set(value))
+  } ensuring(res => isBST(res) && content(res) == content(tree) ++ Set(value))
 
 /*
   def remove(tree : Tree, value : Int) : Tree = {
@@ -77,13 +77,13 @@ object BinarySearchTree {
 
   def createRoot(v: Int): Node = {
     Node(Leaf(), v, Leaf())
-  } //ensuring (content(_) == Set(v))
-/*
+  } ensuring (content(_) == Set(v)) 
+
   def content(tree: Tree): Set[Int] = tree match {
     case Leaf() => Set.empty[Int]
     case Node(l, v, r) => content(l) ++ Set(v) ++ content(r)
   }
-  */
+  
 /*
   def psr (input : Int) : Int = {
     (input * 476272 + 938709) % 187987
@@ -98,7 +98,7 @@ object BinarySearchTree {
   }
 */
   
-  def test(t:Tree, i:Int) = insert(t,i)
+  //def test(t:Tree, i:Int) = insert(t,i)
   def init() = Leaf()
 
 }

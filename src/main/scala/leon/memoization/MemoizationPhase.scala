@@ -747,7 +747,11 @@ object MemoizationPhase extends TransformationPhase {
     }
 
     val unprovenCons = p.definedFunctions.flatMap( fn => fn.precondition.toSeq ++ fn.postcondition.toSeq.map {_._2})
-    dbg("I have these conditions\n" + unprovenCons.mkString("\n"))
+    dbg("I have these conditions")
+    dbg( unprovenCons map { con => 
+      con.toString + "@" + con.getPos.toString 
+    } mkString ("\n") )
+    
     
     val referredFuns = (unprovenCons flatMap { expr => treeCatamorphism(convert,combine,compute,expr) }).toSet
     dbg("Referred functions:\n" + referredFuns.map{_.id.name}.mkString("\n"))

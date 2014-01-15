@@ -9,6 +9,10 @@ import leon.verification.{AnalysisPhase,VerificationReport}
 import java.io.File
 
 class PureScalaVerificationRegression extends LeonTestSuite {
+  
+  // provide excessive output
+  private val debug = false 
+
   private var counter : Int = 0
   private def nextInt() : Int = {
     counter += 1
@@ -32,9 +36,14 @@ class PureScalaVerificationRegression extends LeonTestSuite {
     test("%3d: %s %s".format(nextInt(), displayName, leonOptions.mkString(" "))) {
       assert(file.exists && file.isFile && file.canRead,
              "Benchmark %s is not a readable file".format(displayName))
+      val settings = if (debug) {
+        testContext.settings.copy(debugSections = Set(DebugSectionVerification))
+      } else testContext.settings
 
       val ctx = testContext.copy(
+        reporter = if (debug) new DefaultReporter(settings) else testContext.reporter,
         options = leonOptions.toList,
+        settings = settings,
         files   = List(file)
       )
 

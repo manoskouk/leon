@@ -41,12 +41,6 @@ class DefaultTactic(reporter: Reporter) extends Tactic(reporter) {
             val theExpr = { 
               val resFresh = FreshIdentifier("result", true).setType(body.getType)
               val bodyAndPost = Let(resFresh, body, replace(Map(Variable(id) -> Variable(resFresh)), matchToIfThenElse(post)))
-              /*implicit val debugSec = DebugSectionVerification
-              reporter.debug(post match {
-                case And(args) => "AND with " + args.length + " args\n"
-                case _ => "Not an AND\n"
-              })
-              reporter.debug(post.toString)*/
               val withPrec = if(prec.isEmpty) {
                 bodyAndPost
               } else {
@@ -56,9 +50,10 @@ class DefaultTactic(reporter: Reporter) extends Tactic(reporter) {
               withPrec
             }
             //reporter.debug("The final conditon is: \n" + purescala.ScalaPrinter(theExpr))
-            new VerificationCondition(theExpr, functionDefinition, VCKind.Postcondition, this)
+            new VerificationCondition(theExpr, functionDefinition, VCKind.Postcondition, this).setPos(post)
           }
 
+          // Separate postconditions if they are a conjunction
           val exprs = post match { 
             case And(args) => args
             case _ => Seq(post)

@@ -43,8 +43,10 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
       }
       
       val toRet = funDef.duplicate
-      toRet.postcondition = if (toKeep.isEmpty) None else {
-        Some( (postCons._1, And(toKeep)) )
+      toRet.postcondition = toKeep.length match {
+        case 0 => None 
+        case 1 => Some( (postCons._1, toKeep.head) )
+        case 2 => Some( (postCons._1, And(toKeep)) )
       }
 
       toRet

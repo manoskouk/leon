@@ -25,9 +25,14 @@ import java.io.{BufferedWriter, FileWriter, File}
 class MemoizationSuite extends LeonTestSuite {
   
   // Which tests we are performing
-  val testLooseEq = false 
-  val testMemo    = true
- 
+  object MemoTestSet {
+    val testLooseEq         = false // Loose equality
+    val testMemo            = true  // Test memoization transformation (all meaningful tests)
+    val testOutputValidity  = true  // Test if output file is valid (Pure)Scala
+    val testWithVerify      = true  // Verify programs and only memoize unproven functions
+    val testOutputs         = false // See if program outputs match + performance
+  }
+
   // Define expressions which define CaseClass expression equality correctly
   def looseTypeEq(t1 : TypeTree, t2: TypeTree) : Boolean = (t1, t2) match {
     case (AnyType, AnyType) | (BottomType, BottomType) | (BooleanType, BooleanType) | 
@@ -194,93 +199,109 @@ class MemoizationSuite extends LeonTestSuite {
   val testSizes = Seq(100, 1000, 2000)
 
   private def testMemo(f : File) { 
-    val outFile  = new File ( 
-      resourceDir(outputFilePath).getAbsolutePath ++ "/" ++ f.getName 
-    )
+    import MemoTestSet._
+
+    val outFileName = resourceDir(outputFilePath).getAbsolutePath() ++ "/" ++ f.getName 
+    /*
     val testFile = new File ( 
       resourceDir(testFilePath  ).getAbsolutePath ++ "/" ++ 
       (f.getName.substring(0,f.getName.length - 6)) + "Tests.scala" 
     )
-
+    */
     test ("Testing " + f.getName) {
       // Compile original file
+      val timeOut = 2
+      val settings = testContext.settings.copy(memo = true, debugSections = Set(DebugSectionMemoization))
       val ctx = testContext.copy(
         // We want a reporter that actually prints some output
-        reporter = new DefaultReporter(testContext.settings)
+        reporter = new DefaultReporter(settings),
+        settings = settings,
+        options =  testContext.options :+ LeonValueOption("o", outFileName) :+ LeonValueOption("timeout", timeOut.toString)
       )
 
       ctx.reporter.info("Transforming " + f.getAbsolutePath)
       val transAST = { 
-        import verification.VerificationReport
-        val interm = new LeonPhase[Program,VerificationReport] { 
-          val description = ""
-          val name = ""
-          def run(ctx : LeonContext)(p : Program ) : VerificationReport = 
-            VerificationReport.emptyReport(p)
-        } 
-        (pipeFront andThen interm andThen MemoizationPhase).run(
-          ctx.copy(settings = Settings(memo =  outFile.getAbsolutePath))
-        )(f.getAbsolutePath :: Nil)
+        val pipeline = if (testWithVerify) {
+          verification.AnalysisPhase andThen memoization.ExcludeVerifiedPhase andThen memoization.MemoizationPhase
+        } else {
+          memoization.MemoizationPhase
+        }
+        (pipeFront andThen pipeline).run(ctx)(f.getAbsolutePath :: Nil)
       }
       
       ctx.reporter.info("Recompiling original " + f.getName)
       
-      val origAST = pipeFront.run(ctx)(f.getAbsolutePath :: Nil) 
+      val ctx2 = ctx.copy(reporter = new DefaultReporter(settings))
+      val origAST = pipeFront.run(ctx2)(f.getAbsolutePath :: Nil) 
       
-      //this is not ideal, but the normal way has bugs  :(
-      //ctx.reporter.info( "Recompiling transformed")
-
-      //val transAST2 = pipeFront.run(ctx)(outFile.getAbsolutePath :: Nil) 
-      val transAST2 = transAST
-      
-      def compileTestFun(p : Program) : (Expr, (Expr, Int) => EvaluationResults.Result) = { 
-        //ctx.reporter.info(PrettyPrinter(p))
-        //ctx.reporter.info("Defined functions: " + (p.definedFunctions filter { _.hasImplementation } map (_.id.name) mkString(", ")))
-        // We want to produce code that checks contracts
-        val evaluator = new CodeGenEvaluator(ctx, p , CodeGenParams(checkContracts = true))
-        val testFun =  p.definedFunctions.find(_.id.name == "test").getOrElse {
-          ctx.reporter.fatalError("Test function not defined!")
-        }
-        val initVal = p.definedFunctions.find(_.id.name == "init").getOrElse {
-          ctx.reporter.fatalError("Initial value not defined!")
-        }.body.get
-
-        val args = testFun.args map { _.id }
-        val body = testFun.body.get
-
-        (initVal, evaluator.compileRec(body, args).getOrElse{ctx.reporter.fatalError("Failed to compile test function!")})
+      // Test if output compiles
+      if (testOutputValidity) { 
+        val ctx3 = ctx.copy(reporter = new DefaultReporter(settings))
+        ctx3.reporter.info("Trying to compile transformed file from source...")
+        pipeFront.run(ctx3)(new File(outFileName).getAbsolutePath :: Nil) 
       }
-
-
-      ctx.reporter.info("Compiling original to bytecode")
-      val (init1, compiled1) = compileTestFun(origAST)
-      ctx.reporter.info("Compiling transformed to bytecode")
-      // Cheating around bug
-      // val ex2 = compileAndTest(transAST)
-      val (init2, compiled2) = compileTestFun(transAST2)
       
-      for (size <- testSizes) { 
-        ctx.reporter.info("Now testing for input size " + size)
-        val (res1, time1) = time{compiled1(init1,size)}
-        val (res2, time2) = time{compiled2(init2,size)} 
-        (res1, res2) match {
-          case (Successful(ex1), Successful(ex2)) if (looseEq(ex1,ex2)) => {
-            ctx.reporter.info("  Both programs produced the same output!")
-            ctx.reporter.info("  Time for original    : " + time1 + " microsec.")
-            ctx.reporter.info("  Time for transformed : " + time2 + " microsec.")
-          } 
-          case (RuntimeError(mess1), RuntimeError(mess2)) => 
-            ctx.reporter.info("  Both programs produced an error") 
-          case (EvaluatorError(mess1), _ ) => 
-            ctx.reporter.fatalError ("  Evaluation failed with message: " + mess1)
-          case (_, EvaluatorError(mess2) ) => 
-            ctx.reporter.fatalError ("  Evaluation failed with message: " + mess2)
-          case _ => 
-            ctx.reporter.error("Error")
-            ctx.reporter.error("  Result1 = \n" + res1.toString)
-            ctx.reporter.error("  Result2 = \n" + res2.toString)
-            ctx.reporter.fatalError("  Outputs don't match for input size " + size) 
+
+      //this is not ideal, but the normal way has bugs  :( -- edit : fixed
+      //ctx.reporter.info( "Recompiling transformed")
+      //val transAST2 = pipeFront.run(ctx)(outFile.getAbsolutePath :: Nil) 
+      
+      // Compile to bytecode, check output equality and performance
+      
+      if (testOutputs) {
+
+
+        def compileTestFun(p : Program) : (Expr, (Expr, Int) => EvaluationResults.Result) = { 
+          //ctx.reporter.info(PrettyPrinter(p))
+          //ctx.reporter.info("Defined functions: " + (p.definedFunctions filter { _.hasImplementation } map (_.id.name) mkString(", ")))
+          // We want to produce code that checks contracts
+          val evaluator = new CodeGenEvaluator(ctx, p , CodeGenParams(checkContracts = true))
+          val testFun =  p.definedFunctions.find(_.id.name == "test").getOrElse {
+            ctx.reporter.fatalError("Test function not defined!")
+          }
+          val initVal = p.definedFunctions.find(_.id.name == "init").getOrElse {
+            ctx.reporter.fatalError("Initial value not defined!")
+          }.body.get
+
+          val args = testFun.args map { _.id }
+          val body = testFun.body.get
+
+          (initVal, evaluator.compileRec(body, args).getOrElse{ctx.reporter.fatalError("Failed to compile test function!")})
         }
+
+
+        ctx.reporter.info("Compiling original to bytecode")
+        val (init1, compiled1) = compileTestFun(origAST)
+        ctx.reporter.info("Compiling transformed to bytecode")
+        // Cheating around bug -- fixed
+        // val ex2 = compileAndTest(transAST)
+        //val (init2, compiled2) = compileTestFun(transAST2)
+        val (init2, compiled2) = compileTestFun(transAST)
+        
+        for (size <- testSizes) { 
+          ctx.reporter.info("Now testing for input size " + size)
+          val (res1, time1) = time{compiled1(init1,size)}
+          val (res2, time2) = time{compiled2(init2,size)} 
+          (res1, res2) match {
+            case (Successful(ex1), Successful(ex2)) if (looseEq(ex1,ex2)) => {
+              ctx.reporter.info("  Both programs produced the same output!")
+              ctx.reporter.info("  Time for original    : " + time1 + " microsec.")
+              ctx.reporter.info("  Time for transformed : " + time2 + " microsec.")
+            } 
+            case (RuntimeError(mess1), RuntimeError(mess2)) => 
+              ctx.reporter.info("  Both programs produced an error") 
+            case (EvaluatorError(mess1), _ ) => 
+              ctx.reporter.fatalError ("  Evaluation failed with message: " + mess1)
+            case (_, EvaluatorError(mess2) ) => 
+              ctx.reporter.fatalError ("  Evaluation failed with message: " + mess2)
+            case _ => 
+              ctx.reporter.error("Error")
+              ctx.reporter.error("  Result1 = \n" + res1.toString)
+              ctx.reporter.error("  Result2 = \n" + res2.toString)
+              ctx.reporter.fatalError("  Outputs don't match for input size " + size) 
+          }
+        }
+
       }
 
     }
@@ -288,7 +309,7 @@ class MemoizationSuite extends LeonTestSuite {
   }
 
   // looseEq tests
-  if (testLooseEq) {  
+  if (MemoTestSet.testLooseEq) {  
     
     val theTests = Seq(
       (
@@ -360,7 +381,7 @@ class MemoizationSuite extends LeonTestSuite {
   }
 
   // Actual memoization tests
-  if (testMemo) {
+  if (MemoTestSet.testMemo) {
     forEachFileIn(inputFilePath) { f => 
       testMemo(f)
     }

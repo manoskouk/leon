@@ -1,5 +1,7 @@
 // reverse is not implemented tail-recursively! :(
 
+// Problems : content
+
 import leon.Utils._
 import leon.Annotations._
 
@@ -16,10 +18,10 @@ object AmortizedQueue {
     case Cons(_, xs) => 1 + size(xs)
   }) ensuring(_ >= 0)
 
-  /*def content(l: List) : Set[Int] = l match {
+  def content(l: List) : Set[Int] = l match {
     case Nil() => Set.empty[Int]
     case Cons(x, xs) => Set(x) ++ content(xs)
-  }*/
+  }
 
   def q2l(queue : AbsQueue) : List = queue match {
     case Queue(front, rear) => concat(front, reverse(rear))
@@ -43,7 +45,7 @@ object AmortizedQueue {
   def concat(l1 : List, l2 : List) : List = (l1 match {
     case Nil() => l2
     case Cons(x,xs) => Cons(x, concat(xs, l2))
-  }) ensuring (res => size(res) == size(l1) + size(l2)) // && content(res) == content(l1) ++ content(l2))
+  }) ensuring (res => size(res) == size(l1) + size(l2)  && content(res) == content(l1) ++ content(l2))
 
   def concatTest(l1 : List, l2 : List, i:Int) : List = ({
     require(0 <= i && i < size(l1) + size(l2))
@@ -54,7 +56,7 @@ object AmortizedQueue {
                   else concatTest(xs, l2, i-1))
     }
   }) ensuring (res => size(res) == size(l1) + size(l2) &&
-           //content(res) == content(l1) ++ content(l2) &&
+           content(res) == content(l1) ++ content(l2) &&
            nth(res,i) == (if (i < size(l1)) nth(l1,i) else nth(l2,i-size(l1))) &&
            res == concat(l1,l2))
 
@@ -92,7 +94,7 @@ object AmortizedQueue {
   def reverse(l : List) : List = (l match {
     case Nil() => Nil()
     case Cons(x, xs) => concat(reverse(xs), Cons(x, Nil()))
-  }) //ensuring (res => content(res) == content(l))
+  }) ensuring (res => content(res) == content(l))
 
   def revConcatNth(l1:List, l2:List, i:Int) : Boolean = {
     require(0 <= i && i < size(l1)+size(l2))

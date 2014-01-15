@@ -40,27 +40,48 @@ class InductionTactic(reporter: Reporter) extends DefaultTactic(reporter) {
           case None =>
             Seq.empty
           case Some((pid, post)) =>
-            for (cct <- parentType.knownCCDescendents) yield {
-              val selectors = selectorsOfParentType(parentType, cct, argAsVar)
-                // if no subtrees of parent type, assert property for base case
-              val resFresh = FreshIdentifier("result", true).setType(body.getType)
-              val bodyAndPostForArg = Let(resFresh, body, replace(Map(Variable(pid) -> Variable(resFresh)), matchToIfThenElse(post)))
-              val withPrec = if (prec.isEmpty) bodyAndPostForArg else Implies(matchToIfThenElse(prec.get), bodyAndPostForArg)
 
-              val conditionForChild = 
-                if (selectors.size == 0) 
-                  withPrec
-                else {
-                  val inductiveHypothesis = (for (sel <- selectors) yield {
-                    val resFresh = FreshIdentifier("result", true).setType(body.getType)
-                    val bodyAndPost = Let(resFresh, replace(Map(argAsVar -> sel), body), replace(Map(Variable(pid) -> Variable(resFresh), argAsVar -> sel), matchToIfThenElse(post))) 
-                    val withPrec = if (prec.isEmpty) bodyAndPost else Implies(replace(Map(argAsVar -> sel), matchToIfThenElse(prec.get)), bodyAndPost)
-                    withPrec
-                  })
-                  Implies(And(inductiveHypothesis), withPrec)
-                }
-              new VerificationCondition(Implies(CaseClassInstanceOf(cct, argAsVar), conditionForChild), funDef, VCKind.Postcondition, this).setPos(funDef)
+            def processOnePost(onePost : Expr) : Seq[VerificationCondition] = {
+
+              val children = classDef.knownChildren
+              val conditionsForEachChild = (for (child <- classDef.knownChildren) yield (child match {
+                case ccd @ CaseClassDef(id, prnt, vds) =>
+                  val selectors = selectorsOfParentType(classDefToClassType(classDef), ccd, argAsVar)
+                  // if no subtrees of parent type, assert property for base case
+                  val resFresh = FreshIdentifier("result", true).setType(body.getType)
+                  // In the conclusion we want to SPLIT postconditions
+                  val bodyAndPostForArg = Let(resFresh, body, replace(Map(Variable(pid) -> Variable(resFresh)), matchToIfThenElse(onePost)))
+                  val withPrec = if (prec.isEmpty) bodyAndPostForArg else Implies(matchToIfThenElse(prec.get), bodyAndPostForArg)
+
+                  val conditionForChild = 
+                    if (selectors.size == 0) 
+                      withPrec
+                    else {
+                      val inductiveHypothesis = (for (sel <- selectors) yield {
+                        val resFresh = FreshIdentifier("result", true).setType(body.getType)
+                        // In the hypothesis we DO NOT want to split the postconditions
+                        val bodyAndPost = Let(resFresh, replace(Map(argAsVar -> sel), body), replace(Map(Variable(pid) -> Variable(resFresh), argAsVar -> sel), matchToIfThenElse(post))) 
+                        val withPrec = if (prec.isEmpty) bodyAndPost else Implies(replace(Map(argAsVar -> sel), matchToIfThenElse(prec.get)), bodyAndPost)
+                        withPrec
+                      })
+                      Implies(And(inductiveHypothesis), withPrec)
+                    }
+                  new VerificationCondition(Implies(CaseClassInstanceOf(ccd, argAsVar), conditionForChild), funDef, VCKind.Postcondition, this).setPos(onePost)
+                case _ => scala.sys.error("Abstract class has non-case class subtype.")
+              }))
+              conditionsForEachChild
             }
+            
+            val splitPost = post match {
+              case And(args) => args
+              case _ => Seq(post)
+            }
+
+            val toRet = splitPost flatMap processOnePost
+            implicit val debugSec = DebugSectionVerification
+            reporter.debug("Found these inductive postc.\n" + toRet.mkString("\n"))
+            toRet
+
         }
 
       case None =>

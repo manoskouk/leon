@@ -12,15 +12,33 @@ abstract class Position {
     (this.file == that.file) && (this.line < that.line || this.col < that.col)
   }
 
+  override def hashCode = 41 * ( (if (file != null) file.hashCode else 0) * (41 + line)) + col
+
   override def toString = line+":"+col
+
   def isDefined = true
 }
 
-case class OffsetPosition(line: Int, col: Int, file: File) extends Position
+case class OffsetPosition(line: Int, col: Int, file: File) extends Position {
+  override def equals (other : Any) = other match {
+    case that : OffsetPosition => 
+       this.file == that.file && this.line == that.line && this.col == that.col
+    case _ => false 
+  }
+}
 
 case class RangePosition(lineFrom: Int, colFrom: Int, lineTo: Int, colTo: Int, file: File) extends Position {
   val line = lineFrom
   val col  = colFrom
+
+  override def equals (other : Any) = other match {
+    case that : RangePosition => 
+       this.file == that.file && 
+       this.lineFrom == that.lineFrom && this.colFrom == that.colFrom &&
+       this.lineTo   == that.lineTo   && this.colTo   == that.colTo  
+    case _ => false 
+  }
+
 
   override def toString = lineFrom+":"+colFrom+"->"+lineTo+":"+colTo
 }

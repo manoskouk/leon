@@ -261,20 +261,24 @@ object MemoizationPhase extends TransformationPhase {
       // args are the arguments of the constructor function
 
       // FIXME: Does not work for TuplePatterns
-      def isolateRelevantCases(funArg : Identifier, args:Seq[Identifier])(expr : Expr) : Option[Expr] = {
-
+      def isolateRelevantCases(fun : FunDef, args:Seq[Identifier])(expr : Expr) : Option[Expr] = {
+        // The sole function argument
+        val funArg = fun.args.head.id 
         // Relevant patterns are: 
         // Wildcard
         // CaseClassPattern with classDef
         // instanceOf with supertype of classDef
         def isRelevantPattern(pat: Pattern) : Boolean = pat match { 
-          case WildcardPattern(binder)    => true
+          case WildcardPattern(_) => true
           case CaseClassPattern(_, cc, _) => cc == classDef
           case InstanceOfPattern(_, cc : CaseClassDef) => cc == classDef
           case InstanceOfPattern(_, ab : AbstractClassDef) => 
             ab.knownDescendents contains classDef
           case tp@TuplePattern(_,_) => 
-            ctx.reporter.fatalError("TuplePatterns not supported yet!\n" + tp.toString) //FIXME
+            ctx.reporter.fatalError(
+              tp.getPos + ":\n" +
+              "TuplePatterns not supported yet!\n" + tp.toString
+            ) //FIXME
         }
 
 
@@ -399,20 +403,25 @@ object MemoizationPhase extends TransformationPhase {
           }
 
 
-          case FunctionInvocation(funDef, args_) if (args_ contains Variable(funArg)) => {
+          case fi@FunctionInvocation(funDef, realArgs) if (realArgs contains Variable(funArg)) => {
+            // funDef is also being memoized, so use the variable it has been assigned to
             if (extraFuns exists (_ contains funDef)) { //FIXME slow
               funsValsMap get funDef map Variable
             }
             else {
-              // Isolate the case in the old body function
-              val isolatedBody = 
-                // Recurse manually because arguments of isolateRelevantCases are different
-                searchAndReplace(isolateRelevantCases(funDef.args.head.id,args))(funDef.body.get) 
-              // replace typical parameters with actual
-              Some( replaceFromIDs( 
-                ( funDef.args.map{ _.id } zip args.map(Variable) ).toMap,
-                isolatedBody 
-              ))
+              // Check for possible unlimited unrolling...
+              if ( p.transitivelyCalls(funDef,funDef) ) {
+                ctx.reporter.fatalError(
+                  fi.getPos.toString + ":\n" +
+                  "Function " + fun.id.name + " calls recursive function " + funDef.id.name + 
+                  ", which is not memoized.\n " +
+                  "Memoizing " + fun.id.name + " would lead to multiple/unlimited unfolding of " + funDef.id.name
+                )
+              } else {
+                // Unfold funDef once (replace formal with real args)
+                Some( replaceFromIDs(funDef.args.map{_.id}.zip(realArgs).toMap, funDef.body.get) )
+              }
+
             }
           }
 
@@ -433,9 +442,11 @@ object MemoizationPhase extends TransformationPhase {
           // TupleSelect
           // etc
 
-          case Variable(id) if (id == funArg) => {
+          case vr@Variable(id) if (id == funArg) => {
             // This indicates failure to remove this instance of funDef early...
-            ctx.reporter.fatalError("Failed to remove instance of variable " + id.name +
+            ctx.reporter.fatalError(
+              vr.getPos.toString + ":\n" + 
+              "Failed to remove instance of variable " + id.name + "\n" +
               "while creating constructor function for class " + classDef.id.name
             )
           }
@@ -447,7 +458,7 @@ object MemoizationPhase extends TransformationPhase {
       // The expressions to be assigned to the new vals
       val assignedExprs : List[List[Expr]] = extraFuns map { 
         _ map { fun =>
-          searchAndReplace(isolateRelevantCases(fun.args.head.id,args))(fun.body.get) 
+          searchAndReplace(isolateRelevantCases(fun,args))(fun.body.get) 
         }
       }
 

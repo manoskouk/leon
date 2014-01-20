@@ -28,11 +28,12 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
   def excludeVerified(vRep : VerificationReport) : Program = {
     
     def processFunction(funDef : FunDef, vcs : Seq[VerificationCondition]) : FunDef = {
+
       /* Postconditions */
       val postCon = funDef.postcondition
       // Separate postconditions
       val postCons : (Identifier, Seq[Expr]) = postCon match {
-        case Some( (id, And(args)) ) => (id, args)
+        case Some( (id, And(args)) ) => (id, args.sortWith{ (e1,e2) => e1.getPos < e2.getPos })
         case Some( (id, cond     ) ) => (id, Seq(cond))
         case None                    => (FreshIdentifier("_"), Seq())
       }
@@ -77,7 +78,8 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
         }
       ).toMap
 
-      
+      // To the function definition itself, add an extra argument if it has precon.
+      // that says if it has been verified.
       val (newArgs, newPrecon) : (VarDecls, Option[Expr]) = if (funDef.hasPrecondition) {
         val extraArg = FreshIdentifier("__isVerified").setType(BooleanType)
         (
@@ -96,7 +98,7 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
       toRet.postcondition = finalPostcons.length match {
         case 0 => None 
         case 1 => Some( (postCons._1, finalPostcons.head) )
-        case 2 => Some( (postCons._1, And(finalPostcons)) )
+        case _ => Some( (postCons._1, And(finalPostcons)) )
       }
 
       toRet

@@ -117,21 +117,14 @@ object MemoizationPhase extends TransformationPhase {
     // How many fields were added to the class
     protected var extraFieldsNo = 0
 
-
     // Add all memoized functions from top of the tree as fields
     // Works with side effects!
     def enrichClassDef() : Unit
     enrichClassDef()
  
-
-
- 
- 
     // A new constructor for the caseclass type to make sure 
     // all fields are created with invariants
     val constructor: Option[FunDef]
-
-    
 
     // Make a function that retrieves the newly created fields from the new types
     // This function has to separate cases for the leaf types of this type
@@ -161,27 +154,6 @@ object MemoizationPhase extends TransformationPhase {
             this.caseDescendents map { _.classDef.asInstanceOf[CaseClassDef] } 
           )
 
-          /*
-          // Case patterns
-          val patterns = caseClasses map { cc => 
-            new CaseClassPattern( 
-              binder       = Some(idToFreshLowerCase(cc.id)),
-              caseClassDef = cc,
-              subPatterns  = Seq.fill(cc.fields.length) (WildcardPattern(None))
-            )
-          }
-          // case bodies
-          val caseBodies = caseClasses map { cc => 
-            new CaseClassSelector(
-              cc, 
-              Variable(idToFreshLowerCase(cc.id)), // FIXME maybe needs the pattern binder
-              cc.fields.find( _.id.name == funName.name ).get.id
-            )
-          }
-            
-          // complete cases
-          val cases = (patterns zip caseBodies) map { case (patt, bd) => new SimpleCase(patt, bd) }
-          */
           val cases = for (cc <- caseClasses) yield {
             val id = idToFreshLowerCase(cc.id)
 
@@ -688,72 +660,26 @@ object MemoizationPhase extends TransformationPhase {
     newFun.postcondition = fn.postcondition map { case (id, ex) => (id, sar(ex)) }
     newFun
   }
-/*
-  // Find which functions (may) need to get memoized
-  def findCandidateFuns(vRep : VerificationReport) : Set[FunDef]= {
-    val p = vRep.program
-    val referredFuns : Set[FunDef] = if (vRep.fvcs.isEmpty) {
-      dbg("EMPTY REPORT")
-      p.definedFunctions.toSet 
-    } else {
-      // Find all functions that are referred to from unproven conditions
-      val convert: Expr => Set[FunDef] = (_ => Set.empty)
-      val combine: (Set[FunDef],Set[FunDef]) => Set[FunDef] = (s1, s2) => s1 ++ s2
-      def compute(e: Expr, funs: Set[FunDef]) :  Set[FunDef] = e match {
-        case FunctionInvocation(f2, _) => funs + f2
-        case _ => funs
-      }
-
-      //dbg("I have these unproven conditions\n" + vRep.conditions.filter { _.value!= Some(true) }. map {_.condition}.mkString("\n"))
-      dbg("I have these conditions\n" + vRep.conditions. map {_.condition}.mkString("\n"))
-      val funSets = vRep.conditions filter { 
-        _.value != Some(true) 
-      } map { 
-        cond:VerificationCondition => treeCatamorphism(convert, combine, compute, cond.condition) 
-      }
-      dbg("Referred functions:\n " + funSets.toSet.flatten.map{_.id.name}.mkString("\n"))
-      val toRet1 = funSets.toSet.flatten flatMap p.transitiveCallees
-
-      dbg("Transitive callees:\n " + toRet1.map{_.id.name}.mkString("\n"))
-      // The trans. closure of functions that are called from VCs 
-      val toRet = (toRet1) ++ funSets.toSet.flatten ++ 
-      // ... and add the functions the user has annotated with forceMemo
-      (p.definedFunctions filter { fun => fun.annotations.contains("forceMemo") } ).toSet
-      dbg("I found these candidates:\n" + toRet.map {_.id.name}.mkString("\n"))
-      toRet
-    
-    }
-
-    // Filter these to have the desired form
-    val toRet = referredFuns filter { f =>  
-      f.args.size == 1 &&
-      f.args.head.getType.isInstanceOf[ClassType] &&
-      p.transitivelyCalls(f,f) 
-    }
-
-    dbg("I found these final candidates:\n" + toRet.map {_.id.name}.mkString("\n"))
-    toRet 
-  } */
 
 
   // Find which functions (may) need to get memoized
   def findCandidateFuns(p: Program) : Set[FunDef]= {
-    // Find all functions that are referred to from unproven conditions
-    val convert: Expr => Set[FunDef] = (_ => Set.empty)
-    val combine: (Set[FunDef],Set[FunDef]) => Set[FunDef] = (s1, s2) => s1 ++ s2
-    def compute(e: Expr, funs: Set[FunDef]) :  Set[FunDef] = e match {
-      case FunctionInvocation(f2, _) => funs + f2
-      case _ => funs
+    
+    // All unproven VCs that we receive from the previous pipeline phases
+    val unprovenVCs = p.definedFunctions flatMap {
+      fn => fn.precondition.toSeq ++ fn.postcondition.toSeq.map {_._2}
     }
-
-    val unprovenCons = p.definedFunctions.flatMap( fn => fn.precondition.toSeq ++ fn.postcondition.toSeq.map {_._2})
     dbg("I have these conditions")
-    dbg( unprovenCons map { con => 
+    dbg( unprovenVCs map { con => 
       con.toString + "@" + con.getPos.toString 
     } mkString ("\n") )
     
     
-    val referredFuns = (unprovenCons flatMap { expr => treeCatamorphism(convert,combine,compute,expr) }).toSet
+    val referredFuns : Set[FunDef] = //unprovenVCs flatMap functionCallsOf map { _.funDef }
+      for (
+        cond: Expr <- unprovenVCs.toSet;
+        fi   <- functionCallsOf(cond)
+      ) yield fi.funDef
     dbg("Referred functions:\n" + referredFuns.map{_.id.name}.mkString("\n"))
     
     val transCalles = referredFuns flatMap p.transitiveCallees
@@ -777,15 +703,8 @@ object MemoizationPhase extends TransformationPhase {
   }
 
   def apply(ctx: LeonContext, p : Program) : Program  = {
-  /*  run(ctx)(p)
-  }
 
-  override def run(ctx: LeonContext)(p : Program) : Program = { //vRep: VerificationReport) = {
-*/
-    //val p = vRep.program
     this.ctx = ctx
-
-    //dbg(vRep.summaryString)
 
     var outputFile : String = "memo.out.scala" 
     for (opt <- ctx.options) opt match {
@@ -797,19 +716,17 @@ object MemoizationPhase extends TransformationPhase {
     ctx.reporter.info("Applying memoization transformation on object " + p.mainObject.id.name)
     
     val candidateFuns =   findCandidateFuns(p) //vRep)
-    val defTrees = p.classHierarchyRoots.toList map { cd => MemoClassRecord(p, candidateFuns , cd) }  
+    val defTrees = p.classHierarchyRoots.toList map { cd => MemoClassRecord(p, candidateFuns , cd) }
     
     // Map of (oldFun -> newFun). Will contain only funs that are memoized
     val memoFunsMap = defTrees.flatMap { _.collectFromTree( 
       rec => rec.classDefRecursiveFuns zip rec.memoizedFuns
     )}.flatten.toMap
     
-
     // The non-memoized functions 
     val nonMemoFuns = p.definedFunctions filter { fn => 
       ( memoFunsMap get fn).isEmpty
     }
-
 
     // Map of type -> constructor. only keep CaseClasses with constructors
     val constructorMap : Map[CaseClassDef, FunDef] = defTrees.flatMap { 

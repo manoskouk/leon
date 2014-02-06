@@ -174,7 +174,12 @@ class ScalaPrinter(sb: StringBuffer = new StringBuffer) extends PrettyPrinter(sb
         pp(s, p)
         sb.append(".max")
       case SetCardinality(t) => ppUnary(t, "", ".size")
-      case SubsetOf(set1, set2) => 
+      case SubsetOf(set1, set2) => {
+        pp(set1, p)
+        sb.append(".subsetOf(")
+        pp(set2, p)
+        sb.append(")")
+      }
       case fm@FiniteMap(rs) =>
         if (rs.isEmpty) {
           fm.getType match {

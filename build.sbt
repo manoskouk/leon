@@ -31,7 +31,7 @@ libraryDependencies ++= Seq(
 
 fork in run := true
 
-fork in test := true
+fork in Test := true
 
 logBuffered in Test := false
 

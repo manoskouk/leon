@@ -31,12 +31,12 @@ libraryDependencies ++= Seq(
 
 fork in run := true
 
-fork in test := true
+fork in Test := true
 
 logBuffered in Test := false
 
 testOptions in Test += Tests.Argument("-oD")
 
-javaOptions in (Test, run) += "-Xss128m"
+javaOptions in Test ++= Seq("-Xss64M", "-Xmx512M")//, "-XX:+PrintGCDetails") 
 
 sourcesInBase in Compile := false

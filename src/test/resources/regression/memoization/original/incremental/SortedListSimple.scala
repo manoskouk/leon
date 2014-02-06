@@ -5,12 +5,14 @@ object SortedListSimple {
   case class Cons(head: Int, tail: List) extends List
   case class Nil() extends List
 
+  // O(n)
   @induct
   def size (l : List) : Int = { l match {
     case Nil() => 0
     case Cons(h,t) => 1 + size(t)
   }} ensuring (res => res >= 0 && res > 0)
 
+  // O(n^2)
   def insert(l: List, v: Int): List = {
     require(isSorted(l))
 
@@ -27,7 +29,7 @@ object SortedListSimple {
     }
   } ensuring(isSorted(_))
 
-
+  // O(n)
   def isSorted(l: List): Boolean = l match {
     case Nil() => true
     case Cons(x, Nil()) => true
@@ -39,7 +41,7 @@ object SortedListSimple {
   }
   
   def test(l : List, i : Int) : List = {
-    require(isSorted(l))
+    //require(isSorted(l))
     insert(l,i)
   }
   def init() = Nil()

@@ -212,6 +212,8 @@ object AmortizedQueue {
     } else
       true
   } holds
+  
+  def emptyQueue() : AbsQueue = Queue(Nil(), Nil())
 
 /*  // pseudorandom els. to insert
   def psr (input : Int) : Int = {
@@ -226,7 +228,6 @@ object AmortizedQueue {
       rec(size, emptyQueue)
   }
 */
-  def emptyQueue() : AbsQueue = Queue(Nil(), Nil())
   def test(q:AbsQueue, i:Int) : AbsQueue = enqueue(q,i)
   def init() : AbsQueue = emptyQueue()
 

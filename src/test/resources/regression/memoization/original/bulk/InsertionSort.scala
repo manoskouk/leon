@@ -47,12 +47,15 @@ object InsertionSort {
     }
   } holds
 
+
+  // O(n) 
   def isSorted(l: List): Boolean = l match {
     case Nil() => true
     case Cons(x, Nil()) => true
     case Cons(x, xs@Cons(y, ys)) => x <= y && isSorted(xs) // Manos : changed
   }
 
+  // O(n^2)
   def sortedIns(e: Int, l: List): List = {
     require(isSorted(l)) //  && size(l) <= 5)
     l match {
@@ -63,6 +66,7 @@ object InsertionSort {
     isSorted(res)
   )
 
+  // O(n^3)
   def sort(l: List): List = (l match {
     case Nil() => Nil()
     case Cons(x,xs) => sortedIns(x, sort(xs))
@@ -91,6 +95,8 @@ object InsertionSort {
   }
 */
 
-  def test(l:List , i:Int) : List = sortedIns(i,l)
   def init() : List = Nil()
+  def simpleInsert(l : List, i : Int) : List = Cons(i,l)
+  def test(l : List) : List = sort(l)
+  
 }

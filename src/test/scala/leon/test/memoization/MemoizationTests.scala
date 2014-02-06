@@ -21,18 +21,27 @@ import org.scalatest.matchers.ShouldMatchers._
 
 import java.io.{BufferedWriter, FileWriter, File}
 
+// Which tests we are performing
+object MemoTestOptions {
+  val testLooseEq         = false // Loose equality
+  val testMemo            = true  // Test memoization transformation (all meaningful tests)
+  val testOutputValidity  = true  // Test if output file is valid (Pure)Scala
+  val testWithVerify      = true  // Verify programs and only memoize unproven functions
+  val testOutputs         = true  // See if program outputs match + performance
+  val testOriginalOut     = true // False to test only new, if original is too slow
+  val applyTransform      = false  // Apply memo transform (false if you have outputs)
+  val testInc             = false // Test incremental benchmarks
+  val testBulk            = true // Test bulk benchmarks
+
+  class HowToTest extends Enumeration
+  case object Incremental extends HowToTest // e.g. insertions, one after the other
+  case object Bulk        extends HowToTest // e.g. sorting, one time
+}
+
 
 class MemoizationSuite extends LeonTestSuite {
-  
-  // Which tests we are performing
-  object MemoTestSet {
-    val testLooseEq         = false // Loose equality
-    val testMemo            = true  // Test memoization transformation (all meaningful tests)
-    val testOutputValidity  = true  // Test if output file is valid (Pure)Scala
-    val testWithVerify      = true  // Verify programs and only memoize unproven functions
-    val testOutputs         = false // See if program outputs match + performance
-  }
 
+ 
   // Define expressions which define CaseClass expression equality correctly
   def looseTypeEq(t1 : TypeTree, t2: TypeTree) : Boolean = (t1, t2) match {
     case (AnyType, AnyType) | (BottomType, BottomType) | (BooleanType, BooleanType) | 
@@ -174,12 +183,12 @@ class MemoizationSuite extends LeonTestSuite {
 
   }
 
-  // Time a block and return time in microseconds
-  def time[A]( block : => A) : (A, Long) = {
+  // Time a block and return time in millisec.
+  def time[A]( block : => A) : (A, Double) = {
     val before = System.nanoTime
     val res    = block
     val after  = System.nanoTime 
-    (block, (after - before)/1000)
+    (block, ((after - before) *10 /1000000).toDouble * 0.1)
   }
 
   private def forEachFileIn(path : String)(block : File => Unit) {
@@ -195,19 +204,19 @@ class MemoizationSuite extends LeonTestSuite {
   val outputFilePath = "regression/memoization/memoOut"
   val testFilePath   = "regression/memoization/tests"
 
-  //val testSizes = Seq(10,1000, 2500, 10000, 20000)
-  val testSizes = Seq(100, 1000, 2000)
+  val testSizesAndRepetitions = Seq( 
+    (2000,12)
+  )
 
-  private def testMemo(f : File) { 
-    import MemoTestSet._
+  private def testMemo(f : File, how : MemoTestOptions.HowToTest) { 
+    import MemoTestOptions._
 
-    val outFileName = resourceDir(outputFilePath).getAbsolutePath() ++ "/" ++ f.getName 
-    /*
-    val testFile = new File ( 
-      resourceDir(testFilePath  ).getAbsolutePath ++ "/" ++ 
-      (f.getName.substring(0,f.getName.length - 6)) + "Tests.scala" 
-    )
-    */
+    val outFileName = resourceDir(outputFilePath).getAbsolutePath() ++ "/" ++ {
+      how match {
+        case MemoTestOptions.Incremental => "incremental"
+        case MemoTestOptions.Bulk        => "bulk"
+      }
+    } ++ "/" ++ f.getName 
     test ("Testing " + f.getName) {
       // Compile original file
       val timeOut = 2
@@ -219,14 +228,20 @@ class MemoizationSuite extends LeonTestSuite {
         options =  testContext.options :+ LeonValueOption("o", outFileName) :+ LeonValueOption("timeout", timeOut.toString)
       )
 
-      ctx.reporter.info("Transforming " + f.getAbsolutePath)
-      val transAST = { 
+      ctx.reporter.info("Now testing " + f.getAbsolutePath)
+      
+      val transAST = if (applyTransform) { 
+        ctx.reporter.info("Applying transformation")
         val pipeline = if (testWithVerify) {
           verification.AnalysisPhase andThen memoization.ExcludeVerifiedPhase andThen memoization.MemoizationPhase
         } else {
           memoization.MemoizationPhase
         }
         (pipeFront andThen pipeline).run(ctx)(f.getAbsolutePath :: Nil)
+      } else {
+        ctx.reporter.info("Compiling transformed from source")
+        val ctx1 = ctx.copy(reporter = new DefaultReporter(settings))
+        pipeFront.run(ctx1)(new File(outFileName).getAbsolutePath :: Nil)
       }
       
       ctx.reporter.info("Recompiling original " + f.getName)
@@ -240,65 +255,143 @@ class MemoizationSuite extends LeonTestSuite {
         ctx3.reporter.info("Trying to compile transformed file from source...")
         pipeFront.run(ctx3)(new File(outFileName).getAbsolutePath :: Nil) 
       }
-      
-
-      //this is not ideal, but the normal way has bugs  :( -- edit : fixed
-      //ctx.reporter.info( "Recompiling transformed")
-      //val transAST2 = pipeFront.run(ctx)(outFile.getAbsolutePath :: Nil) 
-      
+       
       // Compile to bytecode, check output equality and performance
       
       if (testOutputs) {
 
-
-        def compileTestFun(p : Program) : (Expr, (Expr, Int) => EvaluationResults.Result) = { 
-          //ctx.reporter.info(PrettyPrinter(p))
-          //ctx.reporter.info("Defined functions: " + (p.definedFunctions filter { _.hasImplementation } map (_.id.name) mkString(", ")))
+        def compileTestFun(p : Program) : (Expr, (Expr, Int) => EvaluationResults.Result) = {
           // We want to produce code that checks contracts
           val evaluator = new CodeGenEvaluator(ctx, p , CodeGenParams(checkContracts = true))
-          val testFun =  p.definedFunctions.find(_.id.name == "test").getOrElse {
-            ctx.reporter.fatalError("Test function not defined!")
+          how match { 
+            case MemoTestOptions.Incremental => {
+              // Incremental have two functions: 
+              // init() : structure, which gives the initial value (Nil etc)
+              // test(structure,element) : structure, which is the incremental test operation (insert etc)
+              val testFun =  p.definedFunctions.find(_.id.name == "test").getOrElse {
+                ctx.reporter.fatalError("Test function not defined!")
+              }
+              val initVal = p.definedFunctions.find(_.id.name == "init").getOrElse {
+                ctx.reporter.fatalError("Initial value not defined!")
+              }.body.get
+
+              val args = testFun.args map { _.id }
+              val body = testFun.body.get
+
+              // Will apply test a number of times with the help of compileRec
+              (
+                initVal, evaluator.compileRec(body, args).getOrElse{
+                  ctx.reporter.fatalError("Failed to compile test function!")
+                }
+              )
+            }
+
+            case MemoTestOptions.Bulk => {
+              // Bulk benchmarks have 3 functions: 
+              // init() : structure , which gives the initial value (Nil etc)
+              // simpleInsert(structure, element) : structure , which is the trivial insertion (e.g. cons)
+              // test(structure), which is the bulk operation we will test (e.g. sort)
+
+
+              val evaluator = new CodeGenEvaluator(ctx, p , CodeGenParams(checkContracts = true))
+              val testFun =  p.definedFunctions.find(_.id.name == "test").getOrElse {
+                ctx.reporter.fatalError("Test function not defined!")
+              }
+              val initVal = p.definedFunctions.find(_.id.name == "init").getOrElse {
+                ctx.reporter.fatalError("Initial value not defined!")
+              }.body.get
+              val simpleInsert = p.definedFunctions.find(_.id.name == "simpleInsert").getOrElse {
+                ctx.reporter.fatalError("simpleInsert function not defined!")
+              }
+
+
+              val args = simpleInsert.args map { _.id }
+              val body = simpleInsert.body.get
+
+              val construct = evaluator.compileRec(body, args).getOrElse{
+                ctx.reporter.fatalError("Failed to compile simpleInsert function!")
+              }
+              val test = evaluator.compile(testFun.body.get, testFun.args.map{_.id}).getOrElse{
+                ctx.reporter.fatalError("Failed to compile test function!")
+              }
+
+              // The complete function will construct a structure with compileRec, then apply 
+              // the test operation with compile
+              def complete(init: Expr, howMany : Int) : EvaluationResults.Result = 
+                construct(init,howMany) match {
+                  case Successful(ex) => test(Seq(ex))
+                  case err : RuntimeError => err
+                  case err : EvaluatorError => err
+                }
+
+              (initVal, complete)
+            }
           }
-          val initVal = p.definedFunctions.find(_.id.name == "init").getOrElse {
-            ctx.reporter.fatalError("Initial value not defined!")
-          }.body.get
-
-          val args = testFun.args map { _.id }
-          val body = testFun.body.get
-
-          (initVal, evaluator.compileRec(body, args).getOrElse{ctx.reporter.fatalError("Failed to compile test function!")})
         }
-
 
         ctx.reporter.info("Compiling original to bytecode")
         val (init1, compiled1) = compileTestFun(origAST)
         ctx.reporter.info("Compiling transformed to bytecode")
-        // Cheating around bug -- fixed
-        // val ex2 = compileAndTest(transAST)
-        //val (init2, compiled2) = compileTestFun(transAST2)
         val (init2, compiled2) = compileTestFun(transAST)
         
-        for (size <- testSizes) { 
-          ctx.reporter.info("Now testing for input size " + size)
-          val (res1, time1) = time{compiled1(init1,size)}
-          val (res2, time2) = time{compiled2(init2,size)} 
-          (res1, res2) match {
-            case (Successful(ex1), Successful(ex2)) if (looseEq(ex1,ex2)) => {
-              ctx.reporter.info("  Both programs produced the same output!")
-              ctx.reporter.info("  Time for original    : " + time1 + " microsec.")
-              ctx.reporter.info("  Time for transformed : " + time2 + " microsec.")
-            } 
-            case (RuntimeError(mess1), RuntimeError(mess2)) => 
-              ctx.reporter.info("  Both programs produced an error") 
-            case (EvaluatorError(mess1), _ ) => 
-              ctx.reporter.fatalError ("  Evaluation failed with message: " + mess1)
-            case (_, EvaluatorError(mess2) ) => 
-              ctx.reporter.fatalError ("  Evaluation failed with message: " + mess2)
-            case _ => 
-              ctx.reporter.error("Error")
-              ctx.reporter.error("  Result1 = \n" + res1.toString)
-              ctx.reporter.error("  Result2 = \n" + res2.toString)
-              ctx.reporter.fatalError("  Outputs don't match for input size " + size) 
+
+        if (testOriginalOut) {
+          ctx.reporter.info(" Size,        Original,     Transformed")
+          for ((size, timesForSize) <- testSizesAndRepetitions) {
+            for (i <- 1 to timesForSize) {  
+              System.gc() // hopefully won't have gc in the middle of things... 
+              //ctx.reporter.info("Start")
+              val (res1, time1) = time{compiled1(init1,size)}
+              //ctx.reporter.info("End")
+              System.gc()
+              //ctx.reporter.info("Start")
+              val (res2, time2) = time{compiled2(init2,size)} 
+              //ctx.reporter.info("End")
+              val outAreEq = (res1, res2) match {
+                case (Successful(ex1), Successful(ex2)) if (looseEq(ex1,ex2)) => {
+                  true
+                } 
+                case (RuntimeError(mess1), RuntimeError(mess2)) => true
+                case (_, _) => false
+              }
+
+              outAreEq match { 
+                case true  => ctx.reporter.info("%5d, %15.1f, %15.1f" format (size, time1, time2) )
+                case false => ctx.reporter.info("%5d, %15.1f, %15.1f ERROR" format (size, time1, time2) )
+              }
+              /*
+              (res1, res2) match {
+                case (Successful(ex1), Successful(ex2)) if (looseEq(ex1,ex2)) => {
+                  ctx.reporter.info("  Both programs produced the same output!")
+                  ctx.reporter.info("  Time for original    : " + ("%.1f" format time1) + " millisec.")
+                  ctx.reporter.info("  Time for transformed : " + ("%.1f" format time2) + " millisec.")
+                } 
+                case (RuntimeError(mess1), RuntimeError(mess2)) => 
+                  ctx.reporter.info("  Both programs produced an error") 
+                case (EvaluatorError(mess1), _ ) => 
+                  ctx.reporter.fatalError ("  Evaluation failed with message: " + mess1)
+                case (_, EvaluatorError(mess2) ) => 
+                  ctx.reporter.fatalError ("  Evaluation failed with message: " + mess2)
+                case _ => 
+                  ctx.reporter.error("Error")
+                  ctx.reporter.error("  Result1 = \n" + res1.toString)
+                  ctx.reporter.error("  Result2 = \n" + res2.toString)
+                  ctx.reporter.fatalError("  Outputs don't match for input size " + size) 
+              }*/
+            }
+          }
+        } else {
+          ctx.reporter.info(" Size, Original,     Transformed")
+          for ((size, timesForSize) <- testSizesAndRepetitions) {
+            for (i <- 1 to timesForSize) {  
+              System.gc() // hopefully won't have gc in the middle of things... 
+              //ctx.reporter.info("Start")
+              // HACK: To quickly measure only the original use this:
+              //val (res2, time2) = time{compiled1(init1,size)} 
+              val (res2, time2) = time{compiled2(init2,size)} 
+              //ctx.reporter.info("End")
+              ctx.reporter.info("%5d,    DUMMY, %15.1f" format (size, time2) )
+            }
           }
         }
 
@@ -309,7 +402,7 @@ class MemoizationSuite extends LeonTestSuite {
   }
 
   // looseEq tests
-  if (MemoTestSet.testLooseEq) {  
+  if (MemoTestOptions.testLooseEq) {  
     
     val theTests = Seq(
       (
@@ -381,9 +474,17 @@ class MemoizationSuite extends LeonTestSuite {
   }
 
   // Actual memoization tests
-  if (MemoTestSet.testMemo) {
-    forEachFileIn(inputFilePath) { f => 
-      testMemo(f)
+  if (MemoTestOptions.testMemo) {
+    if (MemoTestOptions.testInc){
+      forEachFileIn(inputFilePath + "/incremental") { f => 
+        testMemo(f, MemoTestOptions.Incremental)
+      }
+    }
+
+    if (MemoTestOptions.testBulk){
+      forEachFileIn(inputFilePath + "/bulk") { f => 
+        testMemo(f, MemoTestOptions.Bulk)
+      }
     }
   }
 

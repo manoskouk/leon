@@ -141,7 +141,12 @@ class CompilationUnit(val program: Program, val classes: Map[Definition, ClassFi
               jvmClassToDef.get(top.getClass.getName) match {
                 case Some(ccd:CaseClassDef) =>
                   val (children, outp1) = outp.splitAt(cc.productElements().size)
-                  val outCC = CaseClass(ccd, children.toSeq.reverse)
+                  val fields = children.toSeq.reverse
+                  // We need to type any untypedfields
+                  (fields zip ccd.fields) foreach { case (realF, formalF) => 
+                    if (!realF.isTyped) realF.setType(formalF.getType)
+                  }
+                  val outCC = CaseClass(ccd, fields)
                   postOrderAcc(rest, outp1 push outCC)
                 // FIXME added this
                 case Some(_) => throw CompilationException("Unsupported return value : " + top)
@@ -149,11 +154,13 @@ class CompilationUnit(val program: Program, val classes: Map[Definition, ClassFi
               }
             case tpl : runtime.Tuple =>
               val (children, outp1) = outp.splitAt(tpl.getArity)
-              val outTpl = Tuple(children.toSeq.reverse)
+              val fields = children.toSeq.reverse
+              // We need to type any untyped fields
+              val outTpl = Tuple(fields)
               postOrderAcc(rest, outp1 push outTpl)
             case set : runtime.Set => 
               val (children, outp1) = outp.splitAt(set.size()) 
-              val outSet = FiniteSet(children.toSeq.reverse) 
+              val outSet = FiniteSet(children.toSeq.reverse)  // FIXME : If it is empty there is no way to reconstruct the type...
               postOrderAcc(rest, outp1 push outSet)
             case map : runtime.Map =>
               val (children, outp1) = outp.splitAt(2 * map.size()) 

@@ -99,4 +99,11 @@ object BinaryTree {
   def t2lNoDup(t:Tree) : List = ({
     seqNoDup(t,Nil(),Set.empty[Int])._1
   }) ensuring (res => removeDupGives(t2l(t), res))
+
+
+  def init() : List = Nil()
+  def simpleInsert(l:List, i : Int) = Cons(i,l)
+  def test(l:List) : List = removeDup(l)
+
+
 }

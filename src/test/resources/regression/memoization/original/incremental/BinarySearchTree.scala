@@ -98,7 +98,7 @@ object BinarySearchTree {
   }
 */
   
-  //def test(t:Tree, i:Int) = insert(t,i)
+  def test(t:Tree, i:Int) = insert(t,i)
   def init() = Leaf()
 
 }

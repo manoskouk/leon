@@ -15,17 +15,19 @@ object HeapSort {
   case class Leaf() extends Heap
   case class Node(value: Int, left: Heap, right: Heap) extends Heap
 
-
+  //O(logn) assuming leftist
   private def rank(h: Heap) : Int = h match {
     case Leaf() => 0
     case Node(_,_,r) => rank(r) + 1
   }
 
+  // O(nlogn) -- will be called on each node once
   private def hasLeftistProperty(h: Heap) : Boolean = h match {
     case Leaf() => true
     case Node(_,l,r) => hasLeftistProperty(l) && hasLeftistProperty(r) && rank(l) >= rank(r)
   }
 
+  // O(n^2logn)
   def heapSize(t: Heap): Int = {
     require(hasLeftistProperty(t))
     (t match {
@@ -34,6 +36,8 @@ object HeapSort {
     })
   } ensuring(_ >= 0)
 
+  // O(n^2logn) + T(n/2)
+  // O(n^2logn)
   private def merge(h1: Heap, h2: Heap) : Heap = {
     require(hasLeftistProperty(h1) && hasLeftistProperty(h2))
     h1 match {
@@ -49,7 +53,7 @@ object HeapSort {
     }
   } ensuring(res => hasLeftistProperty(res) && heapSize(h1) + heapSize(h2) == heapSize(res))
 
-
+  // O(logn)
   private def makeT(value: Int, left: Heap, right: Heap) : Heap = {
     if(rank(left) >= rank(right))
       Node(value, left, right)
@@ -57,13 +61,15 @@ object HeapSort {
       Node(value, right, left)
   }
 
- def insert(element: Int, heap: Heap) : Heap = {
-   require(hasLeftistProperty(heap))
+  // O(n^2logn)
+  def insert(element: Int, heap: Heap) : Heap = {
+    require(hasLeftistProperty(heap))
 
     merge(Node(element, Leaf(), Leaf()), heap)
 
   } ensuring(res => heapSize(res) == heapSize(heap) + 1)
 
+  // O(nlogn)
   def findMax(h: Heap) : Int = {
     require(hasLeftistProperty(h))
     h match {
@@ -72,6 +78,7 @@ object HeapSort {
     }
   }
 
+  // O(n^2logn)
   def removeMax(h: Heap) : Heap = {
     require(hasLeftistProperty(h))
     h match {
@@ -85,6 +92,7 @@ object HeapSort {
     case Cons(_, xs) => 1 + listSize(xs)
   }) ensuring(_ >= 0)
 
+  // O(n^3logn)
   def removeElements(h : Heap, l : List) : List = {
    require(hasLeftistProperty(h))
    h match {
@@ -93,6 +101,8 @@ object HeapSort {
 
   }} ensuring(res => heapSize(h) + listSize(l) == listSize(res))
 
+  // O(n^2logn) for each node
+  // O(n^3logn)
   def buildHeap(l : List, h: Heap) : Heap = {
    require(hasLeftistProperty(h))
    l match {
@@ -101,6 +111,7 @@ object HeapSort {
 
   }} ensuring(res => hasLeftistProperty(res) && heapSize(h) + listSize(l) == heapSize(res))
 
+  // O(n^3logn)
   def sort(l: List): List = ({
 
     val heap = buildHeap(l,Leaf())
@@ -108,7 +119,7 @@ object HeapSort {
 
   }) ensuring(res => listSize(res) == listSize(l))
 
-  
+  /*
   // pseudorandom els. to insert
   def psr (input : Int) : Int = {
     (input * 476272 + 938709) % 187987
@@ -122,6 +133,10 @@ object HeapSort {
       val l = rec(size, Nil())
       sort(l)
   }
-
+*/
+  
+  def init() : List = Nil()
+  def simpleInsert(l : List, i : Int) = Cons(i,l)
+  def test(l : List) : List = sort(l)
 
 }

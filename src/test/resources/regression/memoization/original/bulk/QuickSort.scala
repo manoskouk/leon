@@ -7,24 +7,29 @@ object QuickSort {
   case class Cons(head:Int,tail:List) extends List
   case class Nil() extends List
 
+  // O(n)
   def contents(l: List): Set[Int] = l match {
     case Nil() => Set.empty
     case Cons(x,xs) => contents(xs) ++ Set(x)
   }
 
+  // O(n)
   def isSorted(l: List): Boolean = l match {
     case Nil() => true
     case Cons(x,Nil()) => true
     case Cons(x,xs@Cons(y,ys)) => x<=y && isSorted(xs)
   }
 
+  // O(n)
   def rev_append(aList:List,bList:List): List = aList match {
     case Nil() => bList
     case Cons(x,xs) => rev_append(xs,Cons(x,bList))
   }
 
+  // O(n)
   def reverse(list:List): List = rev_append(list,Nil())
 
+  // O(n)
   def append(aList:List,bList:List): List = aList match {
     case Nil() => bList
     case _ => rev_append(reverse(aList),bList)
@@ -45,6 +50,7 @@ object QuickSort {
     case Cons(x,xs) => if (n==x) Cons(x,equals(n,xs)) else equals(n,xs)
   }
 
+  // O(nlogn) average
   def quickSort(list:List): List = (list match {
     case Nil() => Nil()
     case Cons(x,Nil()) => list
@@ -56,7 +62,7 @@ object QuickSort {
 
     println(ls)
     println(quickSort(ls))
-  }*/
+  }
 
   def psr (input : Int) : Int = {
     (input * 476272 + 938709) % 187987
@@ -70,5 +76,12 @@ object QuickSort {
       val l = rec(size, Nil())
       quickSort(l)
   }
+*/
+
+
+  def init() : List = Nil()
+  def simpleInsert(l:List, i : Int) = Cons(i,l)
+  def test(l:List) : List = quickSort(l)
 
 }
+

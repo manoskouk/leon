@@ -31,7 +31,7 @@ object MemoizationPhase extends TransformationPhase {
   private val alwaysShowUniqueId = false 
   private def freshIdentifier (name : String) = FreshIdentifier(name, alwaysShowUniqueId)
 
-  abstract class MemoClassRecord[+A <: ClassTypeDef](
+  private abstract class MemoClassRecord[+A <: ClassTypeDef](
     val p : Program,
     val candidateFuns : Set[FunDef],
     val classDef : A,
@@ -213,7 +213,7 @@ object MemoizationPhase extends TransformationPhase {
 
 
 
-  class MemoCaseClassRecord (
+  private class MemoCaseClassRecord (
     p : Program,
     candidateFuns : Set[FunDef],
     classDef : CaseClassDef, 
@@ -224,7 +224,10 @@ object MemoizationPhase extends TransformationPhase {
 
     // Add all memoized functions from top of the tree as fields
     def enrichClassDef() : Unit = {
-      val allExtraFields = collectFromTop(_.extraFieldConcr).flatten map varFromClassDef
+      val allExtraFields = collectFromTop(_.extraFieldConcr).flatten map { cc => 
+        val newId = idToFreshLowerCase(cc.id)
+        new VarDecl(newId, classDefToClassType(cc) )
+      }
       if (!allExtraFields.isEmpty) {
         classDef.fields = classDef.fields ++ allExtraFields
         extraFieldsNo = allExtraFields.length
@@ -398,8 +401,52 @@ object MemoizationPhase extends TransformationPhase {
 
         
         
-          case MatchExpr(tp@Tuple(_), _ ) if (variablesOf(tp) contains funArg) => {
-            ctx.reporter.fatalError("TuplePatterns not supported yet:\n" + tp.toString) //FIXME
+          case me@MatchExpr(tp@Tuple(_), cases ) if (variablesOf(tp) contains funArg) => {
+/*
+            var funDefIndexPaths : Seq[Seq[Int]] = Seq()
+
+            def rec(ex : Expr, indexPath : Seq[Int]) = ex match {
+              case Tuple(tupleArgs) => {
+                val subTuples = for ((expr, ind) <- tupleArgs.zipWithIndex) yield {
+                  rec(expr, indexPath :+ ind)
+                }
+                Tuple(subTuples)
+              }
+              case vr@Variable(id) if id == funArg => {
+                funDefIndexPaths = funDefIndexPaths :+ indexPaths
+                vr
+              }
+              case _ => isolateRelevantCases(funArg, args)(ex)
+            }
+            val isolated = rec(tp, Seq()) 
+            funDefIndexPaths.length match {
+              case 0 => Some( MatchExpr(isolated, cases))
+              case 1 => 
+                val indexPath = funDefIndexPaths.head
+
+                // In the patterns, find the element corresponding to funDef
+                def findPatt(patt : Pattern, indexPath : Seq[Int]) : Pattern  = {
+                  patt match {
+                    case Tuple(args) if !indexPath.isEmpty => 
+                      findPatt(args(indexPath.head), indexPath.tail)
+                    case _           if !indexPath.isEmpty => 
+                      scala.sys.error("Paths don't match when searching for pattern position")
+                    case _           if  indexPath.isEmpty => 
+                      patt
+                  }
+
+                }
+
+                val funDefPatts = for (cs <- cases) yield { findPatt(cs.pattern, indexPath) }
+                ctx.reporter.fatalError("TuplePatterns not supported yet:\n" + tp.toString) //FIXME
+
+
+              case _ => ctx.reporter.fatalError(me.getPos + ":\n" +
+                "Cannot process MatchExpression with multiple instances of " + funDef.toString
+              )
+            }
+*/
+                ctx.reporter.fatalError("TuplePatterns not supported yet:\n" + tp.toString) //FIXME
           }
 
 
@@ -425,6 +472,7 @@ object MemoizationPhase extends TransformationPhase {
             }
           }
 
+          case IfExpr(cond,thenn, elze) => None // Fixme: we may have to drop a branch, as in match
           case CaseClassInstanceOf(cc, Variable(vr)) if (vr == funArg) =>
             // TODO: Why only caseclass?
             Some(BooleanLiteral(cc == classDef)) 
@@ -528,7 +576,7 @@ object MemoizationPhase extends TransformationPhase {
   }
   
 
-  class MemoAbstractClassRecord (
+  private class MemoAbstractClassRecord (
     p : Program,
     candidateFuns : Set[FunDef],
     classDef : AbstractClassDef, 
@@ -545,7 +593,7 @@ object MemoizationPhase extends TransformationPhase {
   }
 
 
-  object MemoClassRecord {
+  private object MemoClassRecord {
     def apply(
       p: Program, 
       candidateFuns: Set[FunDef], 
@@ -583,15 +631,9 @@ object MemoizationPhase extends TransformationPhase {
 
   }
 
-  // Take a ClassTypeDef and make a field with the same name (lower-case) 
-  // and the correct type
-  def varFromClassDef(cc : ClassTypeDef) : VarDecl = {
-    val newId = idToFreshLowerCase(cc.id)
-    new VarDecl(newId, classDefToClassType(cc) )
-  }
-
+  
   // Take an Identifier and produce a fresh with lowewcase first letter
-  def idToFreshLowerCase (id : Identifier) = {
+  private def idToFreshLowerCase (id : Identifier) = {
     val nm = id.name
     freshIdentifier(nm.updated(0,nm.head.toLower))
   }
@@ -604,7 +646,7 @@ object MemoizationPhase extends TransformationPhase {
    * This is meant to be passed as an argument in searchAndReplace
    */
 
-  def replaceConstructors(constructorMap : Map[CaseClassDef, FunDef])(expr : Expr) : Option[Expr] = expr match {
+  private def replaceConstructors(constructorMap : Map[CaseClassDef, FunDef])(expr : Expr) : Option[Expr] = expr match {
     case CaseClass(classDef, args) => constructorMap get classDef match {
       case None         => None 
       case Some(constr) => Some( new FunctionInvocation(constr, args) )
@@ -621,7 +663,7 @@ object MemoizationPhase extends TransformationPhase {
    * This is meant to be passed as an argument in searchAndReplace
    */
 
-  def replaceFunsAndPatternMatching(memoFunsMap : Map[FunDef,FunDef])(expr : Expr) : Option[Expr] = expr match {
+  private def replaceFunsAndPatternMatching(memoFunsMap : Map[FunDef,FunDef])(expr : Expr) : Option[Expr] = expr match {
     case FunctionInvocation(funDef,args) => 
       memoFunsMap get funDef match {
         case None        => None
@@ -660,7 +702,7 @@ object MemoizationPhase extends TransformationPhase {
   }
 
 
-  def replOnFunDef(repl : Expr => Option[Expr])(fn : FunDef) : FunDef = {
+  private def replOnFunDef(repl : Expr => Option[Expr])(fn : FunDef) : FunDef = {
 
     def sar (ex : Expr ) : Expr = searchAndReplace(repl)(ex)
 
@@ -674,7 +716,7 @@ object MemoizationPhase extends TransformationPhase {
 
 
   // Find which functions (may) need to get memoized
-  def findCandidateFuns(p: Program) : Set[FunDef]= {
+  private def findCandidateFuns(p: Program) : Set[FunDef]= {
     
     // All unproven VCs that we receive from the previous pipeline phases
     val unprovenVCs = p.definedFunctions flatMap {

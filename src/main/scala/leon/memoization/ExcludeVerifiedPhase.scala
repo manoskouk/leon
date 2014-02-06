@@ -40,17 +40,17 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
 
       // Get the postcondition VCs, make sure they are in the right order.
       // Because InductionTactic may generate multiple conditions from one expr. we have to group them
-      val verifiedPostCons = ( vcs filter { 
+      val verifiedPostCons = vcs. filter { 
         _.kind == VCKind.Postcondition 
-      } sortWith { 
+      }. sortWith { 
         (vc1,vc2) => vc1.getPos < vc2.getPos 
-      } groupBy { 
+      }. groupBy { 
         _.getPos 
-      }).toSeq
+      }.toSeq.sortWith { (x1,x2) => x1._1 < x2._1 }
       
       // Now keep the original unverified postCons.
       val finalPostcons = postCons._2 zip verifiedPostCons collect { 
-        case (pc, vpc) if vpc._2 exists { _.value != Some(true) } => pc
+        case (pc, (_,vpc)) if vpc exists { _.value != Some(true) } => pc
       }
       
       
@@ -59,14 +59,14 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
       // Function calls of funDef with preconditions, sorted by position
       val funCalls = functionCallsOf(funDef.body.get).toSeq.filter { _.funDef.hasPrecondition }.
         sortWith { (f1, f2) => f1.getPos < f2.getPos }
-      // Verified rreconditions of funDef, sorted by position
-      val verifiedPrecons = ( vcs filter { 
+      // Verified preconditions of funDef, sorted by position
+      val verifiedPrecons = vcs.filter { 
         _.kind == VCKind.Precondition 
-      } sortWith { 
+      }.sortWith { 
         (f1,f2) => f1.getPos < f2.getPos 
-      } groupBy {
+      }.groupBy {
         _.getPos
-      }).toSeq
+      }.toSeq.sortWith { (x1,x2) => x1._1 < x2._1 }
       
       // To function invocations with preconditions, add an extra argument saying if it is verified or not
       val functionCallMap : Map[Expr, Expr] = ( 
@@ -77,7 +77,19 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
           ))
         }
       ).toMap
-
+ /*
+      val funCallsAndPrecs = funCalls.zip(verifiedPrecons).toMap
+      def functionCallMap(e : Expr) : Option[Expr] = e match {
+        case fi@FunctionInvocation(funDef,args) =>
+          funCallsAndPrecs get fi match {
+            case None => None 
+            case Some(precs) => Some(FunctionInvocation(funDef, args :+ BooleanLiteral(
+              precs._2 forall { _.value == Some(true) }  
+            )))
+        }
+        case _ => None 
+      }
+*/
       // To the function definition itself, add an extra argument if it has precon.
       // that says if it has been verified.
       val (newArgs, newPrecon) : (VarDecls, Option[Expr]) = if (funDef.hasPrecondition) {
@@ -121,8 +133,12 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
 
   override def run(ctx: LeonContext)(vRep: VerificationReport) : Program = {
     this.ctx = ctx
+    
     dbg(vRep.summaryString)
-    excludeVerified(vRep)
+    val toRet = excludeVerified(vRep)
+    dbg(purescala.ScalaPrinter(toRet))
+    toRet
+
   }
 
 

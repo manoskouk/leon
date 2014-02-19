@@ -11,6 +11,7 @@ import leon.purescala.TypeTrees._
 import leon.purescala.TreeOps._
 import leon.purescala.Common._
 import memoization._
+import org.scalatest._
 
 import leon.evaluators._
 import leon.evaluators.CodeGenEvaluator._
@@ -39,7 +40,7 @@ object MemoTestOptions {
 }
 
 
-class MemoizationSuite extends LeonTestSuite {
+class MemoizationTest extends LeonTestSuite {
 
  
   // Define expressions which define CaseClass expression equality correctly

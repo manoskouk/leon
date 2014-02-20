@@ -1,7 +1,6 @@
 /* Copyright 2009-2013 EPFL, Lausanne */
 
-package leon.test
-package memoization
+package leon.test.memoization
 
 import leon._
 import leon.purescala.PrettyPrinter
@@ -10,7 +9,7 @@ import leon.purescala.Trees._
 import leon.purescala.TypeTrees._
 import leon.purescala.TreeOps._
 import leon.purescala.Common._
-import memoization._
+import leon.memoization._
 import org.scalatest._
 import utils._
 
@@ -40,7 +39,7 @@ object MemoTestOptions {
 }
 
 
-class MemoizationTest extends LeonTestSuite {
+class MemoizationTest extends leon.test.LeonTestSuite {
 
  
   // Define expressions which define CaseClass expression equality correctly
@@ -276,12 +275,12 @@ class MemoizationTest extends LeonTestSuite {
                 ctx.reporter.fatalError("Initial value not defined!")
               }.body.get
 
-              val args = testFun.args map { _.id }
+              val params = testFun.params map { _.id }
               val body = testFun.body.get
 
               // Will apply test a number of times with the help of compileRec
               (
-                initVal, evaluator.compileRec(body, args).getOrElse{
+                initVal, evaluator.compileRec(body, params).getOrElse{
                   ctx.reporter.fatalError("Failed to compile test function!")
                 }
               )
@@ -306,13 +305,13 @@ class MemoizationTest extends LeonTestSuite {
               }
 
 
-              val args = simpleInsert.args map { _.id }
+              val args = simpleInsert.params map { _.id }
               val body = simpleInsert.body.get
 
               val construct = evaluator.compileRec(body, args).getOrElse{
                 ctx.reporter.fatalError("Failed to compile simpleInsert function!")
               }
-              val test = evaluator.compile(testFun.body.get, testFun.args.map{_.id}).getOrElse{
+              val test = evaluator.compile(testFun.body.get, testFun.params.map{_.id}).getOrElse{
                 ctx.reporter.fatalError("Failed to compile test function!")
               }
 

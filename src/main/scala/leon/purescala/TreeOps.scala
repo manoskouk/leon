@@ -115,6 +115,8 @@ object TreeOps {
    * pre-transformation of the tree, takes a partial function of replacements.
    * Substitutes *before* recursing down the trees.
    *
+   * Supports two modes : if applyRec is false (default), will only substitute once on each level.
+   * 
    * e.g.
    *
    *   Add(a, Minus(b, c)) with replacements: Minus(b,c) -> d, b -> e, d -> f
@@ -122,11 +124,29 @@ object TreeOps {
    * will yield:
    *
    *   Add(a, d)   // And not Add(a, f) because it only substitute once for each level.
+   *   
+   * If applyRec is true, it will substitute multiple times on each level:
+   * 
+   * e.g.
+   *
+   *   Add(a, Minus(b, c)) with replacements: Minus(b,c) -> d, b -> e, d -> f
+   *
+   * will yield:
+   *
+   *   Add(a, f)  
+   *   
+   * WARNING: The latter mode can diverge if f is not well formed ( e.g. def f(e:Expr) = Some(e) )
    */
-  def preMap(f: Expr => Option[Expr])(e: Expr): Expr = {
-    val rec = preMap(f) _
+  def preMap(f: Expr => Option[Expr], applyRec : Boolean = false)(e: Expr): Expr = {
+    val rec = preMap(f, applyRec) _
 
-    val newV = f(e).getOrElse(e)
+    val newV = if (!applyRec) { f(e) getOrElse e} else { // Apply f until you get outside its domain
+      def rec(e:Expr) : Expr = f(e) match {
+        case None => e
+        case Some(e2) => rec(e2) //if (e eq e2) e2 else rec(e2)
+      } 
+      rec(e)
+    }
 
     newV match {
       case u @ UnaryOperator(e, builder) =>
@@ -226,6 +246,11 @@ object TreeOps {
     v2
   }
 
+  
+  
+  
+  
+  
   ///*
   // * Turn a total function returning Option[A] into a partial function
   // * returning A.
@@ -278,22 +303,7 @@ object TreeOps {
     postMap(substs.lift)(expr)
   }
 
-/*
-  def variablesOf(expr: Expr) : Set[Identifier] = {
-    def convert(t: Expr) : Set[Identifier] = t match {
-      case Variable(i) => Set(i)
-      case _ => Set.empty
-    }
-    def combine(s1: Set[Identifier], s2: Set[Identifier]) = s1 ++ s2
-    def compute(t: Expr, s: Set[Identifier]) = t match {
-      case Let(i,_,_) => s -- Set(i)
-      case Choose(is,_) => s -- is
-      case MatchExpr(_, cses) => s -- (cses.map(_.pattern.binders).foldLeft(Set[Identifier]())((a, b) => a ++ b))
-      case _ => s
-    }
-    treeCatamorphism(convert, combine, compute, expr)
-  }
-*/
+
   def replaceFromIDs(substs: Map[Identifier, Expr], expr: Expr) : Expr = {
     postMap( {
         case Variable(i) => substs.get(i)

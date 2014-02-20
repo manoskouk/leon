@@ -92,13 +92,13 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
 */
       // To the function definition itself, add an extra argument if it has precon.
       // that says if it has been verified.
-      val (newArgs, newPrecon) : (Seq[VarDecl], Option[Expr]) = if (funDef.hasPrecondition) {
+      val (newArgs, newPrecon) : (Seq[ValDef], Option[Expr]) = if (funDef.hasPrecondition) {
         val extraArg = FreshIdentifier("__isVerified").setType(BooleanType)
         (
-          funDef.args :+ new VarDecl(extraArg, BooleanType), 
+          funDef.params :+ new ValDef(extraArg, BooleanType), 
           Some(Or(Variable(extraArg), funDef.precondition.get))
         )
-      } else (funDef.args, None)
+      } else (funDef.params, None)
 
 
       val toRet = new FunDef(funDef.id, Seq(), funDef.returnType, newArgs) //FIXME
@@ -123,9 +123,9 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
       processFunction( funDef, vRep.fvcs.getOrElse(funDef,Seq()) )
     }
     // Give a copy of the original program, with the new functions
-    p.duplicate.copy(mainModule = p.mainModule.copy(defs = 
-      p.mainModule.defs.filterNot { _.isInstanceOf[FunDef] } ++ definedFunctions
-    ))
+    p.duplicate.copy(modules = p.modules.map { module => module.copy(defs = 
+      module.defs.filterNot { _.isInstanceOf[FunDef] } ++ definedFunctions
+    )})
 
 
   }

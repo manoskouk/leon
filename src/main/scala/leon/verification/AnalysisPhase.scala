@@ -88,9 +88,7 @@ object AnalysisPhase extends LeonPhase[Program,VerificationReport] {
     import vctx.reporter
     import vctx.solverFactory
     import vctx.program
-    val reporter = vctx.reporter
-    val solvers  = vctx.solvers
-    val p        = vctx.program
+   
 
     val interruptManager = vctx.context.interruptManager
 
@@ -158,7 +156,7 @@ object AnalysisPhase extends LeonPhase[Program,VerificationReport] {
         s.free()
       }
     }
-    new VerificationReport(p, vcs)
+    new VerificationReport(vctx.program, vcs)
   }
 
   def run(ctx: LeonContext)(program: Program) : VerificationReport = {
@@ -211,7 +209,8 @@ object AnalysisPhase extends LeonPhase[Program,VerificationReport] {
     val vctx = VerificationContext(ctx, program, mainSolver, reporter)
 
     reporter.debug("Running verification condition generation...")
-    val vcs = generateVerificationConditions(reporter, program, functionsToAnalyse)
-    checkVerificationConditions(program, vctx, vcs)
+    val vcs = generateVerificationConditions(vctx, functionsToAnalyse)
+    checkVerificationConditions(vctx, vcs)
+
   }
 }

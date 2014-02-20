@@ -11,6 +11,8 @@ import purescala.Common._
 import verification.VerificationReport
 import verification.VerificationCondition
 import utils._
+
+
 object MemoizationPhase extends TransformationPhase {
 
   val name = "Memoization transformation"
@@ -40,7 +42,7 @@ object MemoizationPhase extends TransformationPhase {
     
     // Functions which recursively call themselves with their only argument being of type classDef
     val classDefRecursiveFuns : List[FunDef] = { candidateFuns filter { f =>
-      f.args.head.getType.asInstanceOf[ClassType].classDef == classDef &&
+      f.params.head.getType.asInstanceOf[ClassType].classDef == classDef &&
       ( 
         // TODO : clear out what happens in these cases.   
         if (f.returnType.isInstanceOf[ClassType]) { 
@@ -70,7 +72,7 @@ object MemoizationPhase extends TransformationPhase {
           isCaseObject = false 
         )
         concr.setFields(classDefRecursiveFuns map { fn => 
-          new VarDecl(fn.id.freshen, fn.returnType) 
+          new ValDef(fn.id.freshen, fn.returnType) 
         })
         concr
       })
@@ -147,7 +149,7 @@ object MemoizationPhase extends TransformationPhase {
       // Name of parameter e.g. className
       val paramName = idToFreshLowerCase(classDef.id)
       // Args of resulting function, e.g. ( className : ClassName )
-      val args = List(new VarDecl(paramName, classType)) 
+      val args = List(new ValDef(paramName, classType)) 
 
       // Body of resulting function
       val body: Expr = classDef match { 
@@ -196,14 +198,14 @@ object MemoizationPhase extends TransformationPhase {
     // New versions of funsToMemoize, utilizing the memoized field
     lazy val memoizedFuns : List[FunDef] = classDefRecursiveFuns map { fn =>
       // Identifier of the input function
-      val oldArg = fn.args.head.id
+      val oldArg = fn.params.head.id
       // the new argument will have the new type corresponding to this type
-      val newArg = new VarDecl(freshIdentifier(oldArg.name), classType )
+      val newArg = new ValDef(freshIdentifier(oldArg.name), classType )
       val newFun = new FunDef(
         id = freshIdentifier(fn.id.name), // FIXME use freshen
         Seq(), // FIXME TYPE PARAMS
         returnType = fn.returnType, // This is correct only with side-effects
-        args = List(newArg)
+        params = List(newArg)
       )
       // The object whose field we select is an application of fieldExtractor on newArg
       val argVar = Variable(newArg.id).setType(classType)
@@ -235,7 +237,7 @@ object MemoizationPhase extends TransformationPhase {
     def enrichClassDef() : Unit = {
       val allExtraFields = collectFromTop(_.extraFieldConcr).flatten map { cc => 
         val newId = idToFreshLowerCase(cc.id)
-        new VarDecl(newId, classDefToClassType(cc) )
+        new ValDef(newId, classDefToClassType(cc) )
       }
       if (!allExtraFields.isEmpty) {
         classDef.setFields( classDef.fields ++ allExtraFields )
@@ -275,15 +277,15 @@ object MemoizationPhase extends TransformationPhase {
       // FIXME: Does not work for TuplePatterns
       def isolateRelevantCases(fun : FunDef, args:Seq[Identifier])(expr : Expr) : Option[Expr] = {
         // The sole function argument
-        val funArg = fun.args.head.id 
+        val funArg = fun.params.head.id 
         // Relevant patterns are: 
         // Wildcard
         // CaseClassPattern with classDef
         // instanceOf with supertype of classDef
         def isRelevantPattern(pat: Pattern) : Boolean = pat match { 
           case WildcardPattern(_) => true
-          case CaseClassPattern(_, cc, _) => cc == classDef
-          case InstanceOfPattern(_, cc : CaseClassType) => cc == classDef
+          case CaseClassPattern(_, cc, _) => cc.classDef == classDef
+          case InstanceOfPattern(_, cc : CaseClassType) => cc.classDef == classDef
           case InstanceOfPattern(_, ab : AbstractClassType) => 
             ab.knownDescendents contains classDef
           case tp@TuplePattern(_,_) => 
@@ -455,7 +457,7 @@ object MemoizationPhase extends TransformationPhase {
               )
             }
 */
-                ctx.reporter.fatalError("TuplePatterns not supported yet:\n" + tp.toString) //FIXME
+            ctx.reporter.fatalError("TuplePatterns not supported yet:\n" + tp.toString) //FIXME
           }
 
 
@@ -467,7 +469,7 @@ object MemoizationPhase extends TransformationPhase {
             }
             else {
               // Check for possible unlimited unrolling...
-              if ( p.isRecursive(tfd.fd) ) {
+              if ( p.callGraph.isRecursive(tfd.fd) ) {
                 ctx.reporter.fatalError(
                   fi.getPos.toString + ":\n" +
                   "Function " + fun.id.name + " calls recursive function " + funDef.id.name + 
@@ -476,7 +478,7 @@ object MemoizationPhase extends TransformationPhase {
                 )
               } else {
                 // Unfold funDef once (replace formal with real args)
-                Some( replaceFromIDs(funDef.args.map{_.id}.zip(realArgs).toMap, funDef.body.get) )
+                Some( replaceFromIDs(funDef.params.map{_.id}.zip(realArgs).toMap, funDef.body.get) )
               }
 
             }
@@ -516,7 +518,7 @@ object MemoizationPhase extends TransformationPhase {
       // The expressions to be assigned to the new vals
       val assignedExprs : List[List[Expr]] = extraFuns map { 
         _ map { fun =>
-          postMap(isolateRelevantCases(fun,args))(fun.body.get) 
+          preMap(isolateRelevantCases(fun,args), true)(fun.body.get) 
         }
       }
 
@@ -576,7 +578,7 @@ object MemoizationPhase extends TransformationPhase {
         freshIdentifier("create" + classDef.id.name),
         Seq(), // FIXME Type Params
         classType,
-        args map { arg => new VarDecl(arg, arg.getType) }
+        args map { arg => new ValDef(arg, arg.getType) }
       )
       
       res. body = Some(body)
@@ -654,7 +656,7 @@ object MemoizationPhase extends TransformationPhase {
    *
    *  constructors of old case classes with new constructor functions
    *
-   * This is meant to be passed as an argument in postMap
+   * This is meant to be passed as an argument in preMap
    */
 
   private def replaceConstructors(constructorMap : Map[CaseClassDef, FunDef])(expr : Expr) : Option[Expr] = expr match {
@@ -671,7 +673,7 @@ object MemoizationPhase extends TransformationPhase {
    *  old function invocation with new one
    *  matchings with an extra matching
    *
-   * This is meant to be passed as an argument in postMap
+   * This is meant to be passed as an argument in preMap
    */
 
   private def replaceFunsAndPatternMatching(memoFunsMap : Map[FunDef,FunDef])(expr : Expr) : Option[Expr] = expr match {
@@ -679,15 +681,19 @@ object MemoizationPhase extends TransformationPhase {
       memoFunsMap get tfd.fd match {
         case None        => None
         case Some(newFn) => 
-          Some(FunctionInvocation(tfd,args)) //FIXME
+          Some(FunctionInvocation(newFn.typed,args)) //FIXME
       }
     
     case me : MatchExpr => 
+      
+      var somethingChanged = false // avoid diverging preMap
+      
       // Give a pattern an extra wildcard in the end, if needed (recursive)
       def fixPattern(p: Pattern) : Pattern = p match {
         case CaseClassPattern(binder,caseClassDef, subPatterns) =>
           // Side effects should ensure result of renewing type are visible here,
           // so add one wildcard for each additional field 
+          somethingChanged = caseClassDef.fields.length != subPatterns.length
           val newSubPatterns = (subPatterns map fixPattern) ++
             Seq.fill(caseClassDef.fields.length - subPatterns.length){ WildcardPattern(None) }
           CaseClassPattern(
@@ -696,7 +702,7 @@ object MemoizationPhase extends TransformationPhase {
             newSubPatterns
           )
         case TuplePattern(binder, subPatterns) => {
-          if (subPatterns.length == 0) sys.error("TUPLE WITH 0 ARGS!!!")
+          assert(subPatterns.length > 0, "Tuple with 0 arguments") 
           TuplePattern(binder, subPatterns map fixPattern)
         }
         case _ => p          
@@ -707,18 +713,20 @@ object MemoizationPhase extends TransformationPhase {
         case GuardedCase(patt, guard, rhs) => GuardedCase(fixPattern(patt), guard, rhs)
       }
 
-      Some( new MatchExpr(me.scrutinee, me.cases map fixCase) )
+      // construct the candidate new MatchExpr (side-effects!)
+      val newMe = new MatchExpr(me.scrutinee, me.cases map fixCase)
+      if (somethingChanged) Some(newMe) else None
      
     case _ => None
   }
 
 
-  private def replOnFunDef(repl : Expr => Option[Expr])(fn : FunDef) : FunDef = {
+  private def replOnFunDef(repl : Expr => Option[Expr], applyRec : Boolean = false )(fn : FunDef) : FunDef = {
 
-    def sar (ex : Expr ) : Expr = postMap(repl)(ex)
+    def sar (ex : Expr ) : Expr = preMap(repl, applyRec)(ex)
 
     val newBody = sar(fn.body.get)
-    val newFun = new FunDef(fn.id, Seq(), fn.returnType, fn.args) // FIXME type params
+    val newFun = new FunDef(fn.id, Seq(), fn.returnType, fn.params) // FIXME type params
     newFun.body = Some(newBody)
     newFun.precondition  = fn.precondition  map sar
     newFun.postcondition = fn.postcondition map { case (id, ex) => (id, sar(ex)) }
@@ -746,7 +754,7 @@ object MemoizationPhase extends TransformationPhase {
       ) yield fi.tfd.fd
     dbg("Referred functions:\n" + referredFuns.map{_.id.name}.mkString("\n"))
     
-    val transCalles = referredFuns flatMap p.transitiveCallees
+    val transCalles = referredFuns flatMap p.callGraph.transitiveCallees
     dbg("Transitive callees:\n" + transCalles.map{_.id.name}.mkString("\n"))
 
     // The trans. closure of functions that are called from VCs 
@@ -757,9 +765,9 @@ object MemoizationPhase extends TransformationPhase {
     
     // Filter these to have the desired form
     val toRet = allCandidates filter { f =>  
-      f.args.size == 1 &&
-      f.args.head.getType.isInstanceOf[ClassType] &&
-      p.transitivelyCalls(f,f) 
+      f.params.size == 1 &&
+      f.params.head.getType.isInstanceOf[ClassType] &&
+      p.callGraph.transitivelyCalls(f,f) 
     }
     dbg("I found these final candidates:\n" + toRet.map {_.id.name}.mkString("\n"))
     
@@ -777,7 +785,7 @@ object MemoizationPhase extends TransformationPhase {
       case _ => 
     }
 
-    ctx.reporter.info("Applying memoization transformation on object " + p.mainModule.id.name)
+    ctx.reporter.info("Applying memoization transformation on program " + p.id.name)
     
     val candidateFuns =   findCandidateFuns(p) //vRep)
     val defTrees = p.classHierarchyRoots.toList map { cd => MemoClassRecord(p, candidateFuns , cd) }
@@ -820,14 +828,14 @@ object MemoizationPhase extends TransformationPhase {
     )
 
     // Make a new program containing the above definitions. 
-    val progName = freshIdentifier(p.mainModule.id.name + "Expanded")
-    val newProg = Program(progName, ModuleDef(
+    val progName = freshIdentifier(p.modules.head.id.name + "Expanded") // FIXME find a better name
+    val newProg = new Program(progName, List(ModuleDef(
       progName,
-      newNonMemoFuns ++ newClasses ++ newFuns ++ newConstructors, 
-      p.mainModule.invariants map 
-        postMap(replaceFunsAndPatternMatching(memoFunsMap)) map 
-        postMap(replaceConstructors(constructorMap))
-    ))
+      newNonMemoFuns ++ newClasses ++ newFuns ++ newConstructors//, 
+      //p.mainModule.invariants map 
+      //  preMap(replaceFunsAndPatternMatching(memoFunsMap)) map 
+      //  preMap(replaceConstructors(constructorMap))
+    )))
 
     newProg.writeScalaFile(outputFile)
 

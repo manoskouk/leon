@@ -53,17 +53,8 @@ object MemoizationPhase extends TransformationPhase {
     }}.toList
     val hasLocalMemoFuns = !classDefRecursiveFuns.isEmpty
     
-    /*
-    // Extra fields we are adding to the type. None if there is nothing to add
-    val extraFieldAbstr : Option[AbstractClassDef] = {
-      if (!hasLocalMemoFuns) None 
-      else Some ( new AbstractClassDef(
-        id = freshIdentifier(classDef.id + "FieldsAbstract"),
-        tparams= Seq(), // FIXME
-        parent = None
-      ) )
-    }*/
-    val extraFieldConcr : Option[CaseClassDef] = {
+    
+    val extraField : Option[CaseClassDef] = {
       if (!hasLocalMemoFuns) None 
       else Some ({
         val concr = new CaseClassDef(
@@ -109,7 +100,7 @@ object MemoizationPhase extends TransformationPhase {
     // The new class definitions resulting from this tree
     def newClasses : List[ClassDef] = {
       val localDefs : List[ClassDef] =
-        classDef :: extraFieldConcr.toList//List(extraFieldAbstr,extraFieldConcr).flatten
+        classDef :: extraField.toList//List(extraFieldAbstr,extraFieldConcr).flatten
       localDefs ++ ( children flatMap { _.newClasses } )
     }
       
@@ -144,9 +135,9 @@ object MemoizationPhase extends TransformationPhase {
       // Running example in the comments : say we start with a class called ClassName 
 
       // Name of resulting function e.g. classNameFields
-      val funName = idToFreshLowerCase(extraFieldConcr.get.id) 
+      val funName = idToFreshLowerCase(extraField.get.id) 
       // Return type of res. function. e.g. ClassNameFields
-      val retType = classDefToClassType(extraFieldConcr.get) 
+      val retType = classDefToClassType(extraField.get) 
       // Name of parameter e.g. className
       val paramName = idToFreshLowerCase(classDef.id)
       // Args of resulting function, e.g. ( className : ClassName )
@@ -156,7 +147,6 @@ object MemoizationPhase extends TransformationPhase {
       val body: Expr = classDef match { 
         case cc : CaseClassDef =>
           // Here the body is just retreiving the field
-          //CaseClassSelector(cc, Variable(idToFreshLowerCase(cc.id)), funName)
           CaseClassSelector(new CaseClassType(cc, Seq() /*FIXME*/), Variable(paramName), cc.fields.find(_.id.name == funName.name).get.id)
         case ab : AbstractClassDef => {
           // Construct the cases :
@@ -212,9 +202,9 @@ object MemoizationPhase extends TransformationPhase {
       val argVar = Variable(newArg.id).setType(classType)
       val bodyObject = new FunctionInvocation( fieldExtractor.get.typed(Seq()), List(argVar) ) // FIXME Type params
       newFun.body = Some(CaseClassSelector(
-        CaseClassType(extraFieldConcr.get, Seq()), // FIXME
+        CaseClassType(extraField.get, Seq()), // FIXME
         bodyObject, 
-        extraFieldConcr.get.fields.find{ _.id.name == fn.id.name }.get.id
+        extraField.get.fields.find{ _.id.name == fn.id.name }.get.id
       ))
 
       newFun
@@ -236,7 +226,7 @@ object MemoizationPhase extends TransformationPhase {
 
     // Add all memoized functions from top of the tree as fields
     def enrichClassDef() : Unit = {
-      val allExtraFields = collectFromTop(_.extraFieldConcr).flatten map { cc => 
+      val allExtraFields = collectFromTop(_.extraField).flatten map { cc => 
         val newId = idToFreshLowerCase(cc.id)
         new ValDef(newId, classDefToClassType(cc) )
       }
@@ -256,7 +246,7 @@ object MemoizationPhase extends TransformationPhase {
      
       // Extra fields we are adding to classDef
       val extraCaseClasses : List[CaseClassDef] = 
-        collectFromTop { _.extraFieldConcr } collect { case Some(x) => x }
+        collectFromTop { _.extraField } collect { case Some(x) => x }
       // Functions corresponding to the extra fields
       val extraFuns : List[List[FunDef]] = //FIXME
         collectFromTop { _.classDefRecursiveFuns } filter { !_.isEmpty }

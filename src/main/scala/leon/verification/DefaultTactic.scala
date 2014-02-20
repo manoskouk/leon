@@ -8,7 +8,7 @@ import purescala.Trees._
 import purescala.TreeOps._
 import purescala.Extractors._
 import purescala.Definitions._
-
+import utils._
 import scala.collection.mutable.{Map => MutableMap}
 
 class DefaultTactic(reporter: Reporter) extends Tactic(reporter) {

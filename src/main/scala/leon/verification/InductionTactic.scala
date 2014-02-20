@@ -8,6 +8,7 @@ import purescala.Trees._
 import purescala.TreeOps._
 import purescala.TypeTrees._
 import purescala.Definitions._
+import utils._
 
 class InductionTactic(reporter: Reporter) extends DefaultTactic(reporter) {
   override val description = "Induction tactic for suitable functions"
@@ -42,34 +43,29 @@ class InductionTactic(reporter: Reporter) extends DefaultTactic(reporter) {
           case Some((pid, post)) =>
 
             def processOnePost(onePost : Expr) : Seq[VerificationCondition] = {
+              for (child <- cct.knownCCDescendents) yield { // FIXME only true for 1 level of hierarchy
+                val selectors = selectorsOfParentType(parentType, child, argAsVar)
+                // if no subtrees of parent type, assert property for base case
+                val resFresh = FreshIdentifier("result", true).setType(body.getType)
+                // In the conclusion we want to SPLIT postconditions
+                val bodyAndPostForArg = Let(resFresh, body, replace(Map(Variable(pid) -> Variable(resFresh)), matchToIfThenElse(onePost)))
+                val withPrec = if (prec.isEmpty) bodyAndPostForArg else Implies(matchToIfThenElse(prec.get), bodyAndPostForArg)
 
-              val children = classDef.knownChildren
-              val conditionsForEachChild = (for (child <- classDef.knownChildren) yield (child match {
-                case ccd @ CaseClassDef(id, prnt, vds) =>
-                  val selectors = selectorsOfParentType(classDefToClassType(classDef), ccd, argAsVar)
-                  // if no subtrees of parent type, assert property for base case
-                  val resFresh = FreshIdentifier("result", true).setType(body.getType)
-                  // In the conclusion we want to SPLIT postconditions
-                  val bodyAndPostForArg = Let(resFresh, body, replace(Map(Variable(pid) -> Variable(resFresh)), matchToIfThenElse(onePost)))
-                  val withPrec = if (prec.isEmpty) bodyAndPostForArg else Implies(matchToIfThenElse(prec.get), bodyAndPostForArg)
-
-                  val conditionForChild = 
-                    if (selectors.size == 0) 
+                val conditionForChild = 
+                  if (selectors.size == 0) 
+                    withPrec
+                  else {
+                    val inductiveHypothesis = (for (sel <- selectors) yield {
+                      val resFresh = FreshIdentifier("result", true).setType(body.getType)
+                      // In the hypothesis we DO NOT want to split the postconditions
+                      val bodyAndPost = Let(resFresh, replace(Map(argAsVar -> sel), body), replace(Map(Variable(pid) -> Variable(resFresh), argAsVar -> sel), matchToIfThenElse(post))) 
+                      val withPrec = if (prec.isEmpty) bodyAndPost else Implies(replace(Map(argAsVar -> sel), matchToIfThenElse(prec.get)), bodyAndPost)
                       withPrec
-                    else {
-                      val inductiveHypothesis = (for (sel <- selectors) yield {
-                        val resFresh = FreshIdentifier("result", true).setType(body.getType)
-                        // In the hypothesis we DO NOT want to split the postconditions
-                        val bodyAndPost = Let(resFresh, replace(Map(argAsVar -> sel), body), replace(Map(Variable(pid) -> Variable(resFresh), argAsVar -> sel), matchToIfThenElse(post))) 
-                        val withPrec = if (prec.isEmpty) bodyAndPost else Implies(replace(Map(argAsVar -> sel), matchToIfThenElse(prec.get)), bodyAndPost)
-                        withPrec
-                      })
-                      Implies(And(inductiveHypothesis), withPrec)
-                    }
-                  new VerificationCondition(Implies(CaseClassInstanceOf(ccd, argAsVar), conditionForChild), funDef, VCKind.Postcondition, this).setPos(onePost)
-                case _ => scala.sys.error("Abstract class has non-case class subtype.")
-              }))
-              conditionsForEachChild
+                    })
+                    Implies(And(inductiveHypothesis), withPrec)
+                  }
+                new VerificationCondition(Implies(CaseClassInstanceOf(child, argAsVar), conditionForChild), funDef, VCKind.Postcondition, this).setPos(onePost)
+              }
             }
             
             val splitPost = post match {

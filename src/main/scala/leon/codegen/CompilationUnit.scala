@@ -166,8 +166,8 @@ class CompilationUnit(val ctx: LeonContext,
         jvmToExpr(tpl.get(i))
 
       }
+      Tuple(elems)
     
-    <<<<<<< HEAD
     case gv : GenericValue =>
       gv
 

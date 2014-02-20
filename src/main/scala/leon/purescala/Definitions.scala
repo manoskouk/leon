@@ -58,6 +58,15 @@ object Definitions {
         case d => d
       })))
     }
+    
+    def writeScalaFile(filename: String) {
+      import java.io.FileWriter
+      import java.io.BufferedWriter
+      val fstream = new FileWriter(filename)
+      val out = new BufferedWriter(fstream)
+      out.write(ScalaPrinter(this))
+      out.close
+    }
   }
 
   object Program {
@@ -101,9 +110,9 @@ object Definitions {
     val tparams: Seq[TypeParameterDef]
     def fields: Seq[ValDef]
     val parent: Option[AbstractClassType]
-    def setParent(parent: AbstractClassDef) : self.type // FIXME this prob. won't work
-    def hierarchyRoot : ClassTypeDef = 
-      if (!hasParent) this else parent.get.hierarchyRoot 
+    //def setParent(parent: AbstractClassDef) : self.type // FIXME this prob. won't work
+    def hierarchyRoot : ClassDef = 
+      if (!hasParent) this else parent.get.classDef.hierarchyRoot 
 
     def hasParent = parent.isDefined
 

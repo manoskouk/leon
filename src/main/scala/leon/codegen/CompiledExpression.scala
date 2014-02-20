@@ -88,15 +88,15 @@ class CompiledExpression(unit: CompilationUnit, cf: ClassFile, expression : Expr
       
       unit.jvmToValue(rec(jvmArg, howMany))*/
       
-      var jvmArg = unit.valueToJVM(arg)
+      var jvmArg = unit.exprToJVM(arg)
       var i = howMany
       while(i > 0) { 
-        val jvmInp = unit.valueToJVM(IntLiteral(psr(i)))
+        val jvmInp = unit.exprToJVM(IntLiteral(psr(i)))
         jvmArg = evalToJVM(Seq(jvmArg,jvmInp))
         i = i - 1
       }
 
-      unit.jvmToValue(jvmArg)
+      unit.jvmToExpr(jvmArg)
 
     } catch {
       case ite : InvocationTargetException => throw ite.getCause()

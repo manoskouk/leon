@@ -57,7 +57,7 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
       /* Preconditions */
 
       // Function calls of funDef with preconditions, sorted by position
-      val funCalls = functionCallsOf(funDef.body.get).toSeq.filter { _.funDef.hasPrecondition }.
+      val funCalls = functionCallsOf(funDef.body.get).toSeq.filter { _.tfd.hasPrecondition }.
         sortWith { (f1, f2) => f1.getPos < f2.getPos }
       // Verified preconditions of funDef, sorted by position
       val verifiedPrecons = vcs.filter { 
@@ -92,7 +92,7 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
 */
       // To the function definition itself, add an extra argument if it has precon.
       // that says if it has been verified.
-      val (newArgs, newPrecon) : (VarDecls, Option[Expr]) = if (funDef.hasPrecondition) {
+      val (newArgs, newPrecon) : (Seq[VarDecl], Option[Expr]) = if (funDef.hasPrecondition) {
         val extraArg = FreshIdentifier("__isVerified").setType(BooleanType)
         (
           funDef.args :+ new VarDecl(extraArg, BooleanType), 
@@ -101,11 +101,11 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
       } else (funDef.args, None)
 
 
-      val toRet = new FunDef(funDef.id, funDef.returnType, newArgs)
+      val toRet = new FunDef(funDef.id, Seq(), funDef.returnType, newArgs) //FIXME
       
       toRet.precondition = newPrecon
 
-      toRet.body = Some(searchAndReplace(functionCallMap.get)(funDef.body.get) )
+      toRet.body = Some(postMap(functionCallMap.get)(funDef.body.get) )
       
       toRet.postcondition = finalPostcons.length match {
         case 0 => None 
@@ -123,8 +123,8 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
       processFunction( funDef, vRep.fvcs.getOrElse(funDef,Seq()) )
     }
     // Give a copy of the original program, with the new functions
-    p.duplicate.copy(mainObject = p.mainObject.copy(defs = 
-      p.mainObject.defs.filterNot { _.isInstanceOf[FunDef] } ++ definedFunctions
+    p.duplicate.copy(mainModule = p.mainModule.copy(defs = 
+      p.mainModule.defs.filterNot { _.isInstanceOf[FunDef] } ++ definedFunctions
     ))
 
 

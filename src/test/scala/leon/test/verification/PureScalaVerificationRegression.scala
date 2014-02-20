@@ -5,7 +5,7 @@ package test
 package verification
 
 import leon.verification.{AnalysisPhase,VerificationReport}
-
+import utils._
 import java.io.File
 
 class PureScalaVerificationRegression extends LeonTestSuite {

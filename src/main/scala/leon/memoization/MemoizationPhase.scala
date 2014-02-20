@@ -53,6 +53,7 @@ object MemoizationPhase extends TransformationPhase {
     }}.toList
     val hasLocalMemoFuns = !classDefRecursiveFuns.isEmpty
     
+    /*
     // Extra fields we are adding to the type. None if there is nothing to add
     val extraFieldAbstr : Option[AbstractClassDef] = {
       if (!hasLocalMemoFuns) None 
@@ -61,14 +62,14 @@ object MemoizationPhase extends TransformationPhase {
         tparams= Seq(), // FIXME
         parent = None
       ) )
-    }
+    }*/
     val extraFieldConcr : Option[CaseClassDef] = {
       if (!hasLocalMemoFuns) None 
       else Some ({
         val concr = new CaseClassDef(
           id = freshIdentifier(classDef.id + "Fields"),
           tparams= Seq(), // FIXME
-          parent = Some( AbstractClassType(extraFieldAbstr.get, Seq())), // FIXME type params?
+          parent = None, // Some( AbstractClassType(extraFieldAbstr.get, Seq())), // FIXME type params?
           isCaseObject = false 
         )
         concr.setFields(classDefRecursiveFuns map { fn => 
@@ -108,7 +109,7 @@ object MemoizationPhase extends TransformationPhase {
     // The new class definitions resulting from this tree
     def newClasses : List[ClassDef] = {
       val localDefs : List[ClassDef] =
-        classDef :: List(extraFieldAbstr,extraFieldConcr).flatten
+        classDef :: extraFieldConcr.toList//List(extraFieldAbstr,extraFieldConcr).flatten
       localDefs ++ ( children flatMap { _.newClasses } )
     }
       

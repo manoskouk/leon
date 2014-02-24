@@ -21,7 +21,7 @@ object Common {
       this
     }
 
-    override def toString: String = PrettyPrinter(this)
+    override def toString: String = ScalaPrinter(this)
 
     def asString(implicit ctx: LeonContext): String = {
       ScalaPrinter(this, ctx)

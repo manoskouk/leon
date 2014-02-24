@@ -391,7 +391,12 @@ class PrettyPrinter(opts: PrinterOptions, val sb: StringBuffer = new StringBuffe
           m => pp(m, p)(lvl+1)
         }
         sb.append("}\n")
-
+      
+      case vd: ValDef =>
+        pp(vd.id, p)
+        sb.append(": ")
+        pp(vd.tpe, p)
+      
       case ModuleDef(id, defs) =>
         nl
         sb.append("object ")

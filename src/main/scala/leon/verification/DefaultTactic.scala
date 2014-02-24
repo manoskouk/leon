@@ -69,7 +69,8 @@ class DefaultTactic(reporter: Reporter) extends Tactic(reporter) {
         val cleanBody = expandLets(pre)
 
         val allPathConds = collectWithPathCondition((t => t match {
-          case FunctionInvocation(tfd, _) if(tfd.hasPrecondition) => true
+          case FunctionInvocation(tfd, _) => 
+            tfd.hasPrecondition
           case _ => false
         }), cleanBody)
 

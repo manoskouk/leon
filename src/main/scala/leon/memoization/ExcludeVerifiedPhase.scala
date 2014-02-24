@@ -101,11 +101,13 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
       } else (funDef.params, None)
 
 
-      val toRet = new FunDef(funDef.id, Seq(), funDef.returnType, newArgs) //FIXME
+      val toRet = funDef.copy(params=newArgs)//FIXME type params ?
+      
+      //val toRet = new FunDef(funDef.id, Seq(), funDef.returnType, newArgs) 
       
       toRet.precondition = newPrecon
 
-      toRet.body = Some(postMap(functionCallMap.get)(funDef.body.get) )
+      toRet.body = Some(preMap(functionCallMap.get, true)(funDef.body.get) )
       
       toRet.postcondition = finalPostcons.length match {
         case 0 => None 
@@ -118,13 +120,39 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
     }
 
     val p = vRep.program
-    // Process all functions of p, with no VCs for unverified functions
-    val definedFunctions = for ( funDef <- p.definedFunctions ) yield {
-      processFunction( funDef, vRep.fvcs.getOrElse(funDef,Seq()) )
+    
+    val (verified, notVerified) = p.definedFunctions.partition{ fun => vRep.fvcs.isDefinedAt(fun) }
+    
+     
+    // Pass verified functions through process function
+    val readyVerified = for ( funDef <- verified ) yield {
+      processFunction( funDef, vRep.fvcs.get(funDef).get )
     }
+    
+    // Even not verified functions have to have an argument added
+    val readyNotVerified = for (funDef <- notVerified) yield {
+      // If it has precondition, add extra argument into definition
+      val newParams = if (funDef.hasPrecondition) {
+        funDef.params :+ ValDef(FreshIdentifier("__isVerified"), BooleanType)
+      } else funDef.params
+      val newFunDef = funDef.copy(params = newParams)
+      newFunDef.copyContentFrom(funDef)
+      
+      // For every function with precondition in the function body, 
+      // add false as extra argument because we have not verified it
+      def insertExtraArg(e : Expr) : Option[Expr] = e match {
+        case FunctionInvocation(tfd,args) if tfd.fd.hasPrecondition =>
+          Some(FunctionInvocation(tfd, args :+ BooleanLiteral(false)))
+        case _ => None
+      }
+      preMapOnFunDef(insertExtraArg)(newFunDef)
+      
+    }
+    
+    
     // Give a copy of the original program, with the new functions
     p.duplicate.copy(modules = p.modules.map { module => module.copy(defs = 
-      module.defs.filterNot { _.isInstanceOf[FunDef] } ++ definedFunctions
+      module.defs.filterNot { _.isInstanceOf[FunDef] } ++ readyVerified ++ readyNotVerified
     )})
 
 
@@ -135,6 +163,8 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
     this.ctx = ctx
     
     dbg(vRep.summaryString)
+    ctx.reporter.info("Removing proven formal contracts...")
+
     val toRet = excludeVerified(vRep)
     dbg(purescala.ScalaPrinter(toRet))
     toRet

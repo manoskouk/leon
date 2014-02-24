@@ -192,7 +192,7 @@ object Definitions {
   }
 
   /** Functions (= 'methods' of objects) */
-  class FunDef(val id: Identifier, val tparams: Seq[TypeParameterDef], val returnType: TypeTree, val params: Seq[ValDef]) extends Definition {
+  case class FunDef(val id: Identifier, val tparams: Seq[TypeParameterDef], val returnType: TypeTree, val params: Seq[ValDef]) extends Definition {
     var body: Option[Expr] = None
     def implementation : Option[Expr] = body
     var precondition: Option[Expr] = None
@@ -209,7 +209,15 @@ object Definitions {
       fd.postcondition = postcondition
       fd.parent = parent
       fd.orig = orig
-      fd
+      fd.copiedFrom(this)
+    }
+    
+    def copyContentFrom(from : FunDef) {
+      body 			= from.body
+      precondition 	= from.precondition
+      postcondition = from.postcondition
+      parent 		= from.parent
+      orig 			= from.orig
     }
 
     def hasImplementation : Boolean = body.isDefined

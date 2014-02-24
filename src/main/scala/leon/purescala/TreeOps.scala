@@ -1760,6 +1760,25 @@ object TreeOps {
     simplifyArithmetic(expr0)
   }
 
+  // Apply an expression operation on all expressions contained in a FunDef
+  def applyOnFunDef(operation : Expr => Expr)(funDef : FunDef): FunDef = {
+    val newFunDef = funDef.copy() 
+    newFunDef.body 		   	= funDef.body 			map operation
+    newFunDef.precondition 	= funDef.precondition 	map operation
+    newFunDef.postcondition = funDef.postcondition 	map { case (id, ex) => (id, operation(ex))}
+    for (ann <- funDef.annotations) {
+      newFunDef.addAnnotation(ann)  
+    }
+    newFunDef.parent = funDef.parent
+    newFunDef.orig   = funDef.orig
+    newFunDef.copiedFrom(funDef)
+  }
+    
+  // Direct application of the above
+  def preMapOnFunDef(repl : Expr => Option[Expr], applyRec : Boolean = false )(funDef : FunDef) : FunDef = {
+    applyOnFunDef(preMap(repl, applyRec))(funDef)  
+  }
+  
 
   /**
    * Deprecated API

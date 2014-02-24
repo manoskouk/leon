@@ -95,7 +95,8 @@ class InductionTactic(reporter: Reporter) extends DefaultTactic(reporter) {
           val cleanBody = expandLets(matchToIfThenElse(function.body.get))
 
           val allPathConds = collectWithPathCondition((t => t match {
-            case FunctionInvocation(tfd, _) if(tfd.hasPrecondition) => true
+            case FunctionInvocation(tfd, _) =>
+              tfd.hasPrecondition
             case _ => false
           }), cleanBody)
 

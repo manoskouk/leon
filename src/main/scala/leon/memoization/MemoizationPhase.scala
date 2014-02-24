@@ -714,17 +714,7 @@ object MemoizationPhase extends TransformationPhase {
   }
 
 
-  private def replOnFunDef(repl : Expr => Option[Expr], applyRec : Boolean = false )(fn : FunDef) : FunDef = {
-
-    def sar (ex : Expr ) : Expr = preMap(repl, applyRec)(ex)
-
-    val newBody = sar(fn.body.get)
-    val newFun = new FunDef(fn.id, Seq(), fn.returnType, fn.params) // FIXME type params
-    newFun.body = Some(newBody)
-    newFun.precondition  = fn.precondition  map sar
-    newFun.postcondition = fn.postcondition map { case (id, ex) => (id, sar(ex)) }
-    newFun
-  }
+  
 
 
   // Find which functions (may) need to get memoized
@@ -778,7 +768,7 @@ object MemoizationPhase extends TransformationPhase {
       case _ => 
     }
 
-    ctx.reporter.info("Applying memoization transformation on program " + p.id.name)
+    ctx.reporter.info("Applying memoization transformation on program")
     
     val candidateFuns =   findCandidateFuns(p) //vRep)
     val defTrees = p.classHierarchyRoots map { cd => MemoClassRecord(p, candidateFuns , cd) }
@@ -802,22 +792,22 @@ object MemoizationPhase extends TransformationPhase {
 
     // New non-memo functions, compatible with new types function
     val newNonMemoFuns = ( nonMemoFuns 
-      map replOnFunDef(replaceFunsAndPatternMatching(memoFunsMap))
-      map replOnFunDef(replaceConstructors(constructorMap))
+      map preMapOnFunDef(replaceFunsAndPatternMatching(memoFunsMap))
+      map preMapOnFunDef(replaceConstructors(constructorMap))
     )
     
     // Currently no values allowed in toplevel, so nothing to do with them
 
     val newClasses = defTrees flatMap { _.newClasses }
     val newFuns    = ( defTrees flatMap { _.newFuns } 
-      map replOnFunDef(replaceFunsAndPatternMatching(memoFunsMap))
-      map replOnFunDef(replaceConstructors(constructorMap))
+      map preMapOnFunDef(replaceFunsAndPatternMatching(memoFunsMap))
+      map preMapOnFunDef(replaceConstructors(constructorMap))
     )
     
     // Constructors get a special treatment, to not replace themselves into their own body
     val newConstructors = ( defTrees flatMap { _.newConstructors } 
-      map replOnFunDef(replaceFunsAndPatternMatching(memoFunsMap))
-      map { con => replOnFunDef(replaceConstructors(constructorMap - con.returnType.asInstanceOf[CaseClassType].classDef))(con) }
+      map preMapOnFunDef(replaceFunsAndPatternMatching(memoFunsMap))
+      map { con => preMapOnFunDef(replaceConstructors(constructorMap - con.returnType.asInstanceOf[CaseClassType].classDef))(con) }
     )
 
     // Make a new program containing the above definitions. 

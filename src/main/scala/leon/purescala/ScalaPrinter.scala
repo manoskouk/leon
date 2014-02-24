@@ -70,6 +70,23 @@ class ScalaPrinter(opts: PrinterOptions, sb: StringBuffer = new StringBuffer) ex
                   sb.append(", ")
               }
           }
+          if (!isSimple(d)) {
+            sb.append("{ \n")
+            ind(lvl+1)
+	        pp(d, p)(lvl+1)
+	        sb.append("\n")
+	        ind(lvl)
+	        sb.append("}")
+	        nl
+	        pp(e, p)
+          }
+          else {
+	        pp(d, p)
+            nl
+	        pp(e, p)
+          }       
+        
+        /*
           sb.append(") = ")
           if (!isSimple(d)) sb.append("{ ")
           pp(d, p)
@@ -78,18 +95,28 @@ class ScalaPrinter(opts: PrinterOptions, sb: StringBuffer = new StringBuffer) ex
           ind
           pp(e, p)
           sb.append("\n")
+          
+          */
         }
 
       case Let(b,d,e) =>
         optBraces { implicit lvl =>
           sb.append("val " + b + " = ")
-          if (!isSimple(d)) sb.append("{ ")
-          pp(d, p)
-          if (!isSimple(d)) sb.append("}")
-          sb.append("\n")
-          ind
-          pp(e, p)
-          sb.append("\n")
+          if (!isSimple(d)) {
+            sb.append("{ \n")
+            ind(lvl+1)
+	        pp(d, p)(lvl+1)
+	        sb.append("\n")
+	        ind(lvl)
+	        sb.append("}")
+	        nl
+	        pp(e, p)
+          }
+          else {
+	        pp(d, p)
+            nl
+	        pp(e, p)
+          }       
         }
 
       case LetDef(fd, body) =>

@@ -470,8 +470,9 @@ object MemoizationPhase extends TransformationPhase {
               funsValsMap get funDef map Variable
             }
             else {
+              assert(funDef.hasImplementation)
               // Check for possible unlimited unrolling...
-              if ( p.callGraph.isRecursive(tfd.fd) ) {
+              if ( p.callGraph.isRecursive(funDef) ) {
                 ctx.reporter.fatalError(
                   fi.getPos.toString + ":\n" +
                   "Function " + fun.id.name + " calls recursive function " + funDef.id.name + 
@@ -520,12 +521,13 @@ object MemoizationPhase extends TransformationPhase {
       // The expressions to be assigned to the new vals
       val assignedExprs : Seq[Seq[Expr]] = extraFuns map { 
         _ map { fun =>
+          assert(fun.hasImplementation)
           preMap(isolateRelevantCases(fun,args), true)(fun.body.get) 
         }
       }
 
       // The expressions which will initialize the extra fields 
-      val fieldInitializers : Seq[Expr] = for ( (cc,ids) <- extraCaseClasses zip assignedToVals) yield {
+      val fieldInitializers : Seq[Expr] = for ( (cc,ids) <- extraCaseClasses zip assignedToVals ) yield {
         CaseClass(CaseClassType(cc, Seq() /*FIXME*/), ids map Variable)
       }
        

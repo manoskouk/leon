@@ -14,7 +14,7 @@ import verification.VCKind
 
 object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
 
-  // TODO: make this phase filter preconditions too
+  // TODO: Add splitting of preconditions
   val name = "Exclude Verified VCs phase"
   val description = "Take a verification report for a program, and remove all verified VCs from it."
 
@@ -24,7 +24,6 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
   private var ctx : LeonContext = null
   private def dbg(x:String) = ctx.reporter.debug(x)
   
-  // TODO only works for postconditions
   def excludeVerified(vRep : VerificationReport) : Program = {
     
     def processFunction(funDef : FunDef, vcs : Seq[VerificationCondition]) : FunDef = {
@@ -57,8 +56,11 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
       /* Preconditions */
 
       // Function calls of funDef with preconditions, sorted by position
-      val funCalls = functionCallsOf(funDef.body.get).toSeq.filter { _.tfd.hasPrecondition }.
-        sortWith { (f1, f2) => f1.getPos < f2.getPos }
+      val funCalls = ( funDef.body match {
+        case Some(bd) => functionCallsOf(bd).toSeq.filter { _.tfd.hasPrecondition }
+        case None => Seq()
+      }).sortWith { (f1, f2) => f1.getPos < f2.getPos }
+      
       // Verified preconditions of funDef, sorted by position
       val verifiedPrecons = vcs.filter { 
         _.kind == VCKind.Precondition 
@@ -77,19 +79,8 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
           ))
         }
       ).toMap
- /*
-      val funCallsAndPrecs = funCalls.zip(verifiedPrecons).toMap
-      def functionCallMap(e : Expr) : Option[Expr] = e match {
-        case fi@FunctionInvocation(funDef,args) =>
-          funCallsAndPrecs get fi match {
-            case None => None 
-            case Some(precs) => Some(FunctionInvocation(funDef, args :+ BooleanLiteral(
-              precs._2 forall { _.value == Some(true) }  
-            )))
-        }
-        case _ => None 
-      }
-*/
+ 
+      
       // To the function definition itself, add an extra argument if it has precon.
       // that says if it has been verified.
       val (newArgs, newPrecon) : (Seq[ValDef], Option[Expr]) = if (funDef.hasPrecondition) {
@@ -103,11 +94,9 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
 
       val toRet = funDef.copy(params=newArgs)//FIXME type params ?
       
-      //val toRet = new FunDef(funDef.id, Seq(), funDef.returnType, newArgs) 
-      
       toRet.precondition = newPrecon
 
-      toRet.body = Some(preMap(functionCallMap.get, true)(funDef.body.get) )
+      toRet.body = funDef.body map preMap(functionCallMap.get, true) 
       
       toRet.postcondition = finalPostcons.length match {
         case 0 => None 
@@ -145,8 +134,7 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
           Some(FunctionInvocation(tfd, args :+ BooleanLiteral(false)))
         case _ => None
       }
-      preMapOnFunDef(insertExtraArg)(newFunDef)
-      
+      preMapOnFunDef(insertExtraArg)(newFunDef)    
     }
     
     
@@ -154,7 +142,6 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
     p.duplicate.copy(modules = p.modules.map { module => module.copy(defs = 
       module.defs.filterNot { _.isInstanceOf[FunDef] } ++ readyVerified ++ readyNotVerified
     )})
-
 
   }
 
@@ -168,7 +155,6 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
     val toRet = excludeVerified(vRep)
     dbg(purescala.ScalaPrinter(toRet))
     toRet
-
   }
 
 

@@ -451,6 +451,15 @@ object MemoizationPhase extends TransformationPhase {
             ctx.reporter.fatalError("TuplePatterns not supported yet:\n" + tp.toString) //FIXME
           }
 
+          case IfExpr(cond, thenn, elze) if (variablesOf(cond) contains funArg) =>
+            // Try to simplify condition, based on the constructor simplifications 
+            val newCond = isolateRelevantCases(fun,args)(cond)
+            newCond match {
+              case Some(BooleanLiteral(true)) => Some(thenn)
+              case Some(BooleanLiteral(false)) => Some(elze)
+              case Some(newCond) => Some(IfExpr(newCond,thenn,elze)) // Condition changed in some way
+              case None => None // Condition did not change, return None so that preMap now descends deeper
+            }
           
 
           case fi@FunctionInvocation(tfd, realArgs) if (realArgs contains Variable(funArg)) => {
@@ -479,7 +488,7 @@ object MemoizationPhase extends TransformationPhase {
           case IfExpr(cond,thenn, elze) => None // Fixme: we may have to drop a branch, as in match
           case CaseClassInstanceOf(cc, Variable(vr)) if (vr == funArg) =>
             // TODO: Why only caseclass?
-            Some(BooleanLiteral(cc == classDef)) 
+            Some(BooleanLiteral(cc.classDef == classDef)) 
         
           // If we are trying to get a field of funDef, 
           // we can just get the function argument in the same position

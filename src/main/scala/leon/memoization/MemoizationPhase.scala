@@ -61,10 +61,10 @@ object MemoizationPhase extends TransformationPhase {
         val concr = new CaseClassDef(
           id = freshIdentifier(classDef.id + "Fields"),
           tparams= Seq(), // FIXME
-          parent = None, // Some( AbstractClassType(extraFieldAbstr.get, Seq())), // FIXME type params?
+          parent = None, 
           false 
         )
-        concr.setFields(classDefRecursiveFuns map { fn => 
+        concr.setFields( for (fn <- classDefRecursiveFuns) yield {  
           new ValDef(fn.id.freshen, fn.returnType) 
         })
         concr
@@ -78,12 +78,13 @@ object MemoizationPhase extends TransformationPhase {
       case _   => children ++ (children flatMap { _.descendents })
     }
     
-    lazy val caseDescendents = descendents filter { _.isLeaf }
+    lazy val caseDescendents = for (desc <- descendents if desc.isInstanceOf[MemoCaseClassRecord]) yield (desc.asInstanceOf[MemoCaseClassRecord]) 
     
+    /*
     def isLeaf : Boolean = classDef match {
       case _ : CaseClassDef  => true
       case _                 => false
-    }
+    }*/
 
     def classType = classDefToClassType(classDef)
     def hasParent = !parent.isEmpty
@@ -149,11 +150,10 @@ object MemoizationPhase extends TransformationPhase {
           // Here the body is just retrieving the field
           CaseClassSelector(new CaseClassType(cc, Seq() /*FIXME*/), Variable(paramName), cc.fields.find(_.id.name == funName.name).get.id)
         case ab : AbstractClassDef => {
+          
           // Construct the cases :
           // The case classes on which we will match
-          val caseClasses : Seq[CaseClassDef]= ( 
-            this.caseDescendents map { _.classDef.asInstanceOf[CaseClassDef] } 
-          )
+          val caseClasses = this.caseDescendents map { _.classDef }  
 
           val cases = for (cc <- caseClasses) yield {
             val id = idToFreshLowerCase(cc.id)
@@ -742,7 +742,7 @@ object MemoizationPhase extends TransformationPhase {
     } mkString ("\n") )
     
     
-    val referredFuns : Set[FunDef] = //unprovenVCs flatMap functionCallsOf map { _.funDef }
+    val referredFuns : Set[FunDef] = 
       for (
         cond: Expr <- unprovenVCs.toSet;
         fi   <- functionCallsOf(cond)
@@ -773,16 +773,14 @@ object MemoizationPhase extends TransformationPhase {
 
     this.ctx = ctx
 
-    var outputFile : String = "memo.out.scala" 
-    for (opt <- ctx.options) opt match {
-      case LeonValueOption("o", file) =>
-        outputFile = file 
-      case _ => 
-    }
+    // Get the output file name from command line, or use default
+    val outputFile = ( for (LeonValueOption("o", file) <- ctx.options) yield file ).headOption.getOrElse("memo.out.scala")
 
     ctx.reporter.info("Applying memoization transformation on program")
     
-    val candidateFuns =   findCandidateFuns(p) 
+    val candidateFuns = findCandidateFuns(p) 
+    
+    // The trees of the program class hierarchy
     val defTrees = p.classHierarchyRoots map { MemoClassRecord(p, candidateFuns , _) }
     
     // Map of (oldFun -> newFun). Will contain only funs that are memoized
@@ -833,7 +831,7 @@ object MemoizationPhase extends TransformationPhase {
     
 
     // Make a new program containing the above definitions. 
-    val progName = freshIdentifier(p.modules.head.id.name + "Expanded") // FIXME find a better name
+    val progName = freshIdentifier(p.modules.head.id.name + "Expanded") // FIXME find a better name + handle modules better
     val newProg = new Program(progName, List(ModuleDef(
       progName,
       newNonMemoFuns ++ newClasses ++ newFuns ++ newConstructors//, 

@@ -1,16 +1,17 @@
-package leon
-package memoization
+package leon.memoization
 
 import leon._
-import leon.utils._
+import utils._
+
 import purescala.Definitions._
 import purescala.TypeTrees._
 import purescala.TreeOps._
 import purescala.Trees._
 import purescala.Common._
+import purescala.TreeOps
+
 import verification.VerificationReport
 import verification.VerificationCondition
-import utils._
 
 
 object MemoizationPhase extends TransformationPhase {
@@ -61,7 +62,7 @@ object MemoizationPhase extends TransformationPhase {
           id = freshIdentifier(classDef.id + "Fields"),
           tparams= Seq(), // FIXME
           parent = None, // Some( AbstractClassType(extraFieldAbstr.get, Seq())), // FIXME type params?
-          isCaseObject = false 
+          false 
         )
         concr.setFields(classDefRecursiveFuns map { fn => 
           new ValDef(fn.id.freshen, fn.returnType) 
@@ -145,7 +146,7 @@ object MemoizationPhase extends TransformationPhase {
       // Body of resulting function
       val body: Expr = classDef match { 
         case cc : CaseClassDef =>
-          // Here the body is just retreiving the field
+          // Here the body is just retrieving the field
           CaseClassSelector(new CaseClassType(cc, Seq() /*FIXME*/), Variable(paramName), cc.fields.find(_.id.name == funName.name).get.id)
         case ab : AbstractClassDef => {
           // Construct the cases :
@@ -225,7 +226,7 @@ object MemoizationPhase extends TransformationPhase {
 
     // Add all memoized functions from top of the tree as fields
     def enrichClassDef() : Unit = {
-      val allExtraFields = collectFromTop(_.extraField).flatten map { cc => 
+      val allExtraFields = for (Some(cc) <- collectFromTop(_.extraField)) yield {  
         val newId = idToFreshLowerCase(cc.id)
         new ValDef(newId, CaseClassType(cc, Seq()) ) //FIXME
       }
@@ -450,6 +451,7 @@ object MemoizationPhase extends TransformationPhase {
             ctx.reporter.fatalError("TuplePatterns not supported yet:\n" + tp.toString) //FIXME
           }
 
+          
 
           case fi@FunctionInvocation(tfd, realArgs) if (realArgs contains Variable(funArg)) => {
             val funDef = tfd.fd
@@ -513,8 +515,8 @@ object MemoizationPhase extends TransformationPhase {
       }
 
       // The expressions which will initialize the extra fields 
-      val fieldInitializers : Seq[Expr] = (extraCaseClasses zip assignedToVals) map {
-        case (cc, ids) => CaseClass(CaseClassType(cc, Seq() /*FIXME*/), ids map Variable)
+      val fieldInitializers : Seq[Expr] = for ( (cc,ids) <- extraCaseClasses zip assignedToVals) yield {
+        CaseClass(CaseClassType(cc, Seq() /*FIXME*/), ids map Variable)
       }
        
       // The final return value of the function
@@ -541,13 +543,11 @@ object MemoizationPhase extends TransformationPhase {
         tSort(toPreds, Seq()).reverse
       }
       val valsWithExprs : Seq[(Identifier, Expr)] = assignedToVals.flatten zip assignedExprs.flatten
-      val edges : Map[(Identifier,Expr),Set[(Identifier,Expr)]] = ( 
-        valsWithExprs map { case (vl1, expr1) =>
-          (vl1, expr1) -> (valsWithExprs collect { 
-            case (vl2, expr2) if (variablesOf(expr1) contains vl2) => (vl2,expr2)
-          }).toSet 
-        }
-      ).toMap
+      val edges : Map[(Identifier,Expr),Set[(Identifier,Expr)]] = ( for ( (vl1, expr1) <- valsWithExprs) yield {
+        (vl1, expr1) -> (valsWithExprs collect { 
+          case (vl2, expr2) if (variablesOf(expr1) contains vl2) => (vl2,expr2)
+        }).toSet 
+      }).toMap
       val assignments: Seq[(Identifier, Expr)] = try {
         topoSort(edges)
       } 
@@ -568,7 +568,7 @@ object MemoizationPhase extends TransformationPhase {
         freshIdentifier("create" + classDef.id.name),
         Seq(), // FIXME Type Params
         classType,
-        args map { arg => new ValDef(arg, arg.getType) }
+        for (arg <- args) yield { new ValDef(arg, arg.getType) }
       )
       
       res. body = Some(body)
@@ -590,9 +590,9 @@ object MemoizationPhase extends TransformationPhase {
     
     // recursive! 
     val children : Seq[MemoClassRecord[ClassDef]] = 
-      classDef.knownChildren map { cd => MemoClassRecord(p, candidateFuns, cd, this) }
+      classDef.knownChildren map { MemoClassRecord(p, candidateFuns, _, this) }
 
-    def enrichClassDef = { } 
+    def enrichClassDef() = { } 
   }
 
 
@@ -770,13 +770,16 @@ object MemoizationPhase extends TransformationPhase {
 
     ctx.reporter.info("Applying memoization transformation on program")
     
-    val candidateFuns =   findCandidateFuns(p) //vRep)
-    val defTrees = p.classHierarchyRoots map { cd => MemoClassRecord(p, candidateFuns , cd) }
+    val candidateFuns =   findCandidateFuns(p) 
+    val defTrees = p.classHierarchyRoots map { MemoClassRecord(p, candidateFuns , _) }
     
     // Map of (oldFun -> newFun). Will contain only funs that are memoized
-    val memoFunsMap = defTrees.flatMap { _.collectFromTree( 
-      rec => rec.classDefRecursiveFuns zip rec.memoizedFuns
-    )}.flatten.toMap
+    val memoFunsMap = ( for (
+      tree <- defTrees;
+      funs1 <- tree collectFromTree {_.classDefRecursiveFuns} ;
+      funs2 <- tree collectFromTree {_.memoizedFuns} ;
+      fun  <- funs1 zip funs2
+    ) yield fun ).toMap
     
     // The non-memoized functions 
     val nonMemoFuns = p.definedFunctions filter { fn => 
@@ -784,31 +787,38 @@ object MemoizationPhase extends TransformationPhase {
     }
 
     // Map of type -> constructor. only keep CaseClasses with constructors
-    val constructorMap : Map[CaseClassDef, FunDef] = defTrees.flatMap { 
-      _.collectFromTree { rec => (rec.classDef, rec.constructor) }
-    }.collect { case (cc, Some(constr)) => (cc.asInstanceOf[CaseClassDef], constr)
-    }.toMap
+    val constructorMap = ( for (
+      tree <- defTrees;
+      (cc, Some(constr)) <- tree collectFromTree { rec => (rec.classDef, rec.constructor)}     
+    ) yield (cc.asInstanceOf[CaseClassDef], constr) ). toMap
     
-
+    // Apply both transformations on a funDef, parametrized by constructorMap (because we use different ones)
+    def replaceAll(conMap: Map[CaseClassDef, FunDef]) = 
+      (preMapOnFunDef(replaceFunsAndPatternMatching(memoFunsMap))(_)) andThen
+      (preMapOnFunDef(replaceConstructors(conMap))(_))
+    
     // New non-memo functions, compatible with new types function
-    val newNonMemoFuns = ( nonMemoFuns 
-      map preMapOnFunDef(replaceFunsAndPatternMatching(memoFunsMap))
-      map preMapOnFunDef(replaceConstructors(constructorMap))
-    )
+    val newNonMemoFuns = nonMemoFuns map replaceAll(constructorMap)
     
     // Currently no values allowed in toplevel, so nothing to do with them
 
     val newClasses = defTrees flatMap { _.newClasses }
-    val newFuns    = ( defTrees flatMap { _.newFuns } 
-      map preMapOnFunDef(replaceFunsAndPatternMatching(memoFunsMap))
-      map preMapOnFunDef(replaceConstructors(constructorMap))
-    )
+    val newFuns = for (
+      tree <- defTrees;
+      newFun <- tree.newFuns
+    ) yield replaceAll(constructorMap)(newFun)
+    
     
     // Constructors get a special treatment, to not replace themselves into their own body
-    val newConstructors = ( defTrees flatMap { _.newConstructors } 
-      map preMapOnFunDef(replaceFunsAndPatternMatching(memoFunsMap))
-      map { con => preMapOnFunDef(replaceConstructors(constructorMap - con.returnType.asInstanceOf[CaseClassType].classDef))(con) }
-    )
+    val newConstructors = for (
+      tree <- defTrees;
+      constr <- tree.newConstructors 
+    ) yield {
+      val ccd = constr.returnType.asInstanceOf[CaseClassType].classDef
+      val newMap = constructorMap - ccd
+      replaceAll(newMap)(constr) 
+    }
+    
 
     // Make a new program containing the above definitions. 
     val progName = freshIdentifier(p.modules.head.id.name + "Expanded") // FIXME find a better name

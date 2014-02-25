@@ -225,13 +225,14 @@ object MemoizationPhase extends TransformationPhase {
     val children: Seq[MemoClassRecord[CaseClassDef]] = Seq()
 
     // Add all memoized functions from top of the tree as fields
-    def enrichClassDef() : Unit = {
+    def enrichClassDef() {
       val allExtraFields = for (Some(cc) <- collectFromTop(_.extraField)) yield {  
         val newId = idToFreshLowerCase(cc.id)
         new ValDef(newId, CaseClassType(cc, Seq()) ) //FIXME
       }
       if (!allExtraFields.isEmpty) {
         classDef.setFields( classDef.fields ++ allExtraFields )
+        classDef.makeClass()
         extraFieldsNo = allExtraFields.length
       }
     }

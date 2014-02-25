@@ -151,7 +151,7 @@ object Definitions {
     }
 
     val isAbstract: Boolean
-    val isCaseObject: Boolean
+    def isCaseObject: Boolean
   }
 
   /** Abstract classes. */
@@ -161,15 +161,22 @@ object Definitions {
 
     val fields = Nil
     val isAbstract   = true
-    val isCaseObject = false
+    def isCaseObject = false
   }
 
   /** Case classes/objects. */
-  case class CaseClassDef(val id: Identifier,
-                          val tparams: Seq[TypeParameterDef],
-                          val parent: Option[AbstractClassType],
-                          val isCaseObject: Boolean) extends ClassDef {
+  case class CaseClassDef(
+      val id: Identifier,
+      val tparams: Seq[TypeParameterDef],
+      val parent: Option[AbstractClassType],
+      private var _isCaseObject: Boolean
+  ) extends ClassDef {
 
+    def isCaseObject = _isCaseObject
+    
+    def makeObject() = _isCaseObject = true
+    def makeClass()  = _isCaseObject = false
+    
     var _fields = Seq[ValDef]()
 
     def fields = _fields

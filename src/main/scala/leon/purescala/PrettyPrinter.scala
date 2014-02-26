@@ -311,7 +311,8 @@ class PrettyPrinter(opts: PrinterOptions, val sb: StringBuffer = new StringBuffe
       // Patterns
       case CaseClassPattern(bndr, cct, subps) =>
         bndr.foreach(b => sb.append(b + " @ "))
-        pp(cct, p)
+        // Patterns don't need type parameters
+        pp(cct.id, p)
         sb.append("(")
         var c = 0
         val sz = subps.size
@@ -460,7 +461,7 @@ class PrettyPrinter(opts: PrinterOptions, val sb: StringBuffer = new StringBuffe
 
         parent.foreach{ par =>
           sb.append(" extends ")
-          pp(par.id, p)
+          pp(par, p)
         }
 
         if (ccd.methods.nonEmpty) {

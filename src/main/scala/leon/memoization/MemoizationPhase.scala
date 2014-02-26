@@ -156,9 +156,7 @@ object MemoizationPhase extends TransformationPhase {
           val cases = for (cc <- caseClasses) yield {
             val id = idToFreshLowerCase(cc.id)
 
-            val patt = new CaseClassPattern( Some(id), new CaseClassType(cc, freshTpParams /*FIXME*/), 
-              Seq.fill(cc.fields.length) (WildcardPattern(None))
-            )
+            val patt = InstanceOfPattern( Some(id), new CaseClassType(cc, freshTpParams /*FIXME*/) )
 
             val bd = new CaseClassSelector( new CaseClassType(cc,freshTpParams /*FIXME*/), Variable(id),
               cc.fields.find( _.id.name == funName.name ).get.id

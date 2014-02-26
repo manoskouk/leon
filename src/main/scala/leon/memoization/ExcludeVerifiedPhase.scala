@@ -141,9 +141,22 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
     }
     
     
+    // Lastly, substitute all function calls in the new functions with the new functions
+    val theMap = ((verified ++ notVerified) zip (readyVerified ++ readyNotVerified)).toMap
+    
+    def refreshFunInvs (e : Expr) = e match {
+      case FunctionInvocation(TypedFunDef(fd,tps),args) if theMap.contains(fd) =>
+        Some( FunctionInvocation(theMap.get(fd).get.typed(tps), args) )
+      case _ => None 
+    }
+    
+    val finalFuns = for (fun <- readyVerified ++ readyNotVerified) yield {
+      preMapOnFunDef(refreshFunInvs)(fun)
+    }
+    
     // Give a copy of the original program, with the new functions
     p.duplicate.copy(modules = p.modules.map { module => module.copy(defs = 
-      module.defs.filterNot { _.isInstanceOf[FunDef] } ++ readyVerified ++ readyNotVerified
+      module.defs.filterNot { _.isInstanceOf[FunDef] } ++ finalFuns
     )})
 
   }
@@ -156,7 +169,7 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
     ctx.reporter.info("Removing proven formal contracts...")
 
     val toRet = excludeVerified(vRep)
-    //dbg(purescala.ScalaPrinter(toRet))
+    dbg(purescala.ScalaPrinter(toRet))
     toRet
   }
 

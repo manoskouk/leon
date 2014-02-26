@@ -1,3 +1,5 @@
+/* Copyright 2009-2013 EPFL, Lausanne */
+
 package leon
 package memoization
 
@@ -92,7 +94,7 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
       } else (funDef.params, None)
 
 
-      val toRet = funDef.copy(params=newArgs)//FIXME type params ?
+      val toRet = funDef.copy(params=newArgs) // FIXME tparams OK
       
       toRet.precondition = newPrecon
 

@@ -1,3 +1,5 @@
+/* Copyright 2009-2013 EPFL, Lausanne */
+
 package leon.memoization
 
 import leon._
@@ -5,8 +7,9 @@ import utils._
 
 import purescala.Definitions._
 import purescala.TypeTrees._
-import purescala.TreeOps._
+import purescala.TypeTreeOps._
 import purescala.Trees._
+import purescala.TreeOps._
 import purescala.Common._
 import purescala.TreeOps
 
@@ -41,6 +44,10 @@ object MemoizationPhase extends TransformationPhase {
     val parent : Option[MemoClassRecord[AbstractClassDef]] 
   ) {
     
+    // The type parameters of classDef
+    val tparamIds = classDef.tparams map { _.id } 
+    
+    
     // Functions which recursively call themselves with their only argument being of type classDef
     val classDefRecursiveFuns : Seq[FunDef] = candidateFuns.toSeq filter { f =>
       f.params.head.getType.asInstanceOf[ClassType].classDef == classDef &&
@@ -60,7 +67,7 @@ object MemoizationPhase extends TransformationPhase {
       else Some ({
         val concr = new CaseClassDef(
           id = freshIdentifier(classDef.id + "Fields"),
-          tparams= Seq(), // FIXME
+          tparams= for (id <- tparamIds) yield  TypeParameterDef(TypeParameter(id.freshen)), // FIXME Maybe we don't need them all
           parent = None, 
           false 
         )
@@ -73,18 +80,9 @@ object MemoizationPhase extends TransformationPhase {
 
 
     val children : Seq[MemoClassRecord[_]]
-    lazy val descendents : Seq[MemoClassRecord[_]] = children match { 
-      case Nil => Nil 
-      case _   => children ++ (children flatMap { _.descendents })
-    }
+    lazy val descendents : Seq[MemoClassRecord[_]] = children ++ (children flatMap { _.descendents }) 
     
     lazy val caseDescendents = for (desc <- descendents if desc.isInstanceOf[MemoCaseClassRecord]) yield (desc.asInstanceOf[MemoCaseClassRecord]) 
-    
-    /*
-    def isLeaf : Boolean = classDef match {
-      case _ : CaseClassDef  => true
-      case _                 => false
-    }*/
 
     def classType = classDefToClassType(classDef)
     def hasParent = !parent.isEmpty
@@ -137,18 +135,20 @@ object MemoizationPhase extends TransformationPhase {
 
       // Name of resulting function e.g. classNameFields
       val funName = idToFreshLowerCase(extraField.get.id) 
+      // Type parameters of resultinf function
+      val freshTpParams = for (id <- tparamIds) yield TypeParameter(id.freshen)
       // Return type of res. function. e.g. ClassNameFields
-      val retType = CaseClassType(extraField.get, Seq()) // FIXME 
+      val retType = CaseClassType(extraField.get,freshTpParams) // FIXME OK
       // Name of parameter e.g. className
       val paramName = idToFreshLowerCase(classDef.id)
-      // Args of resulting function, e.g. ( className : ClassName )
+      // Arguments of resulting function, e.g. ( className : ClassName )
       val args = Seq(new ValDef(paramName, classType)) 
 
       // Body of resulting function
       val body: Expr = classDef match { 
         case cc : CaseClassDef =>
           // Here the body is just retrieving the field
-          CaseClassSelector(new CaseClassType(cc, Seq() /*FIXME*/), Variable(paramName), cc.fields.find(_.id.name == funName.name).get.id)
+          CaseClassSelector(new CaseClassType(cc, freshTpParams /*FIXME*/), Variable(paramName), cc.fields.find(_.id.name == funName.name).get.id)
         case ab : AbstractClassDef => {
           
           // Construct the cases :
@@ -158,11 +158,11 @@ object MemoizationPhase extends TransformationPhase {
           val cases = for (cc <- caseClasses) yield {
             val id = idToFreshLowerCase(cc.id)
 
-            val patt = new CaseClassPattern( Some(id), new CaseClassType(cc, Seq() /*FIXME*/), 
+            val patt = new CaseClassPattern( Some(id), new CaseClassType(cc, freshTpParams /*FIXME*/), 
               Seq.fill(cc.fields.length) (WildcardPattern(None))
             )
 
-            val bd = new CaseClassSelector( new CaseClassType(cc,Seq() /*FIXME*/), Variable(id),
+            val bd = new CaseClassSelector( new CaseClassType(cc,freshTpParams /*FIXME*/), Variable(id),
               cc.fields.find( _.id.name == funName.name ).get.id
             )
 
@@ -171,7 +171,7 @@ object MemoizationPhase extends TransformationPhase {
 
 
           // the variable to do case analysis on
-          val scrutinee = Variable(paramName).setType(AbstractClassType(ab, Seq())) // FIXME
+          val scrutinee = Variable(paramName).setType(AbstractClassType(ab, freshTpParams)) // FIXME
 
           // The complete match expr.
           MatchExpr(scrutinee, cases)
@@ -179,7 +179,7 @@ object MemoizationPhase extends TransformationPhase {
       }
 
       // Now construct the whole definition and add body
-      val funDef = new FunDef(funName, Seq(), retType, args) // FIXME type params
+      val funDef = new FunDef(funName, freshTpParams map TypeParameterDef, retType, args) // FIXME type params
       funDef.body = Some(body)
       
       //dbg(funDef.toString)
@@ -188,21 +188,23 @@ object MemoizationPhase extends TransformationPhase {
 
     // New versions of funsToMemoize, utilizing the memoized field
     lazy val memoizedFuns : Seq[FunDef] = classDefRecursiveFuns map { fn =>
+      // Fresh type parameters for the memoized function
+      val freshTpParams = for (id <- tparamIds) yield TypeParameter(id.freshen)
       // Identifier of the input function
       val oldArg = fn.params.head.id
       // the new argument will have the new type corresponding to this type
       val newArg = new ValDef(freshIdentifier(oldArg.name), classType )
       val newFun = new FunDef(
-        id = freshIdentifier(fn.id.name), // FIXME use freshen
-        Seq(), // FIXME TYPE PARAMS
-        returnType = fn.returnType, // This is correct only with side-effects
+        id = fn.id.freshen, 
+        freshTpParams map TypeParameterDef, // FIXME TYPE PARAMS
+        returnType = typeParamSubst( (tparamIds map TypeParameter zip freshTpParams).toMap)(fn.returnType) , // This is correct only with side-effects
         params = Seq(newArg)
       )
       // The object whose field we select is an application of fieldExtractor on newArg
       val argVar = Variable(newArg.id).setType(classType)
-      val bodyObject = new FunctionInvocation( fieldExtractor.get.typed(Seq()), Seq(argVar) ) // FIXME Type params
+      val bodyObject = new FunctionInvocation( fieldExtractor.get.typed(freshTpParams), Seq(argVar) ) // FIXME Type params
       newFun.body = Some(CaseClassSelector(
-        CaseClassType(extraField.get, Seq()), // FIXME
+        CaseClassType(extraField.get, freshTpParams), // FIXME
         bodyObject, 
         extraField.get.fields.find{ _.id.name == fn.id.name }.get.id
       ))
@@ -226,9 +228,10 @@ object MemoizationPhase extends TransformationPhase {
 
     // Add all memoized functions from top of the tree as fields
     def enrichClassDef() {
+      val freshTpParams = for (id <- tparamIds) yield TypeParameter(id.freshen)
       val allExtraFields = for (Some(cc) <- collectFromTop(_.extraField)) yield {  
         val newId = idToFreshLowerCase(cc.id)
-        new ValDef(newId, CaseClassType(cc, Seq()) ) //FIXME
+        new ValDef(newId, CaseClassType(cc, freshTpParams ) ) //FIXME
       }
       if (!allExtraFields.isEmpty) {
         classDef.setFields( classDef.fields ++ allExtraFields )
@@ -256,12 +259,13 @@ object MemoizationPhase extends TransformationPhase {
       val assignedToVals : Seq[Seq[Identifier]] = extraCaseClasses map { 
         _.fields map { field =>
           freshIdentifier(field.id.name + "_").setType(field.getType) 
-          // TODO: WHY DOES VARDECL OVERRIDE GETTYPE? :'(
         }
       }
 
       val funsValsMap = (extraFuns.flatten zip assignedToVals.flatten).toMap 
+      val freshTpParams = for (id <- tparamIds) yield TypeParameter(id.freshen)
 
+      
       // Take an expression and isolate the case relevant for this constructor function
       // funArg is the argument of the original function
       // args are the arguments of the constructor function
@@ -528,12 +532,12 @@ object MemoizationPhase extends TransformationPhase {
 
       // The expressions which will initialize the extra fields 
       val fieldInitializers : Seq[Expr] = for ( (cc,ids) <- extraCaseClasses zip assignedToVals ) yield {
-        CaseClass(CaseClassType(cc, Seq() /*FIXME*/), ids map Variable)
+        CaseClass(CaseClassType(cc, freshTpParams), ids map Variable)
       }
        
       // The final return value of the function
       val returnValue : Expr = CaseClass(
-        CaseClassType(classDef, Seq() ), //FIXME
+        CaseClassType(classDef, freshTpParams ), //FIXME
         (args map Variable) ++ fieldInitializers 
       )
 
@@ -578,7 +582,7 @@ object MemoizationPhase extends TransformationPhase {
 
       val res = new FunDef(
         freshIdentifier("create" + classDef.id.name),
-        Seq(), // FIXME Type Params
+        freshTpParams map TypeParameterDef, // FIXME Type Params
         classType,
         for (arg <- args) yield { new ValDef(arg, arg.getType) }
       )
@@ -664,7 +668,7 @@ object MemoizationPhase extends TransformationPhase {
   private def replaceConstructors(constructorMap : Map[CaseClassDef, FunDef])(expr : Expr) : Option[Expr] = expr match {
     case CaseClass(classTp, args) => constructorMap get classTp.classDef match {
       case None         => None 
-      case Some(constr) => Some( new FunctionInvocation(constr.typed, args) ) //FIXME
+      case Some(constr) => Some( new FunctionInvocation(constr.typed(constr.tparams map { _.tp } ), args) ) //FIXME
     }
     case _ => None
   }
@@ -683,7 +687,7 @@ object MemoizationPhase extends TransformationPhase {
       memoFunsMap get tfd.fd match {
         case None        => None
         case Some(newFn) => 
-          Some(FunctionInvocation(newFn.typed,args)) //FIXME
+          Some(FunctionInvocation(newFn.typed(newFn.tparams map { _.tp }),args)) //FIXME
       }
     
     case me : MatchExpr => 
@@ -774,7 +778,7 @@ object MemoizationPhase extends TransformationPhase {
     this.ctx = ctx
 
     // Get the output file name from command line, or use default
-    val outputFile = ( for (LeonValueOption("o", file) <- ctx.options) yield file ).headOption.getOrElse("memo.out.scala")
+    val outputFile = ( for (LeonValueOption("o", file) <- ctx.options) yield file ).lastOption.getOrElse("memo.out.scala")
 
     ctx.reporter.info("Applying memoization transformation on program")
     

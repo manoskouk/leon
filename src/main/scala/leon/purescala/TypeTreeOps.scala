@@ -51,7 +51,7 @@ object TypeTreeOps {
 
       var chain1 = computeChain(c1)
       var chain2 = computeChain(c2)
-
+      // FIXME returns Nothing for e.g. List[A] and Nil[Nothing]
       val prefix = (chain1 zip chain2).takeWhile { case (ct1, ct2) => ct1 == ct2 }.map(_._1)
 
       prefix.lastOption
@@ -102,7 +102,7 @@ object TypeTreeOps {
     }
   }
 
-  private def typeParamSubst(map: Map[TypeParameter, TypeTree])(tpe: TypeTree): TypeTree = tpe match {
+  def typeParamSubst(map: Map[TypeParameter, TypeTree])(tpe: TypeTree): TypeTree = tpe match {
     case (tp: TypeParameter) => map.getOrElse(tp, tp)
     case NAryType(tps, builder) => builder(tps.map(typeParamSubst(map)))
   }

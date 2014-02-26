@@ -152,11 +152,11 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
   override def run(ctx: LeonContext)(vRep: VerificationReport) : Program = {
     this.ctx = ctx
     
-    dbg(vRep.summaryString)
+    ctx.reporter.info(vRep.summaryString)
     ctx.reporter.info("Removing proven formal contracts...")
 
     val toRet = excludeVerified(vRep)
-    dbg(purescala.ScalaPrinter(toRet))
+    //dbg(purescala.ScalaPrinter(toRet))
     toRet
   }
 

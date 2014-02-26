@@ -9,9 +9,9 @@ import utils._
 import purescala.Common._
 import purescala.Definitions._
 import purescala.Trees._
-import purescala.TreeOps.{variablesOf,functionCallsOf,preMap,preMapOnFunDef,replaceFromIDs}
+import purescala.TreeOps.{variablesOf,functionCallsOf,preMap,applyOnFunDef,preMapOnFunDef,replaceFromIDs}
 import purescala.TypeTrees._
-import purescala.TypeTreeOps.{typeParamSubst}
+import purescala.TypeTreeOps.{typeParamSubst,instantiateType}
 
 import verification.{VerificationReport,VerificationCondition}
 
@@ -44,8 +44,7 @@ object MemoizationPhase extends TransformationPhase {
   ) {
     
     // The type parameters of classDef
-    val tparamIds = classDef.tparams map { _.id } 
-    
+    def freshenClassDefTpParams() = for (tp <- classDef.tparams) yield TypeParameter(tp.id.freshen)    
     
     // Functions which recursively call themselves with their only argument being of type classDef
     val classDefRecursiveFuns : Seq[FunDef] = candidateFuns.toSeq filter { f =>
@@ -66,7 +65,7 @@ object MemoizationPhase extends TransformationPhase {
       else Some ({
         val concr = new CaseClassDef(
           id = freshIdentifier(classDef.id + "Fields"),
-          tparams= for (id <- tparamIds) yield  TypeParameterDef(TypeParameter(id.freshen)), // FIXME Maybe we don't need them all
+          tparams= freshenClassDefTpParams() map TypeParameterDef, // FIXME Maybe we don't need them all
           parent = None, 
           false 
         )
@@ -135,7 +134,7 @@ object MemoizationPhase extends TransformationPhase {
       // Name of resulting function e.g. classNameFields
       val funName = idToFreshLowerCase(extraField.get.id) 
       // Type parameters of resultinf function
-      val freshTpParams = for (id <- tparamIds) yield TypeParameter(id.freshen)
+      val freshTpParams = freshenClassDefTpParams()
       // Return type of res. function. e.g. ClassNameFields
       val retType = CaseClassType(extraField.get,freshTpParams) // FIXME OK
       // Name of parameter e.g. className
@@ -188,7 +187,7 @@ object MemoizationPhase extends TransformationPhase {
     // New versions of funsToMemoize, utilizing the memoized field
     lazy val memoizedFuns : Seq[FunDef] = classDefRecursiveFuns map { fn =>
       // Fresh type parameters for the memoized function
-      val freshTpParams = for (id <- tparamIds) yield TypeParameter(id.freshen)
+      val freshTpParams = freshenClassDefTpParams()
       // Identifier of the input function
       val oldArg = fn.params.head.id
       // the new argument will have the new type corresponding to this type
@@ -196,7 +195,7 @@ object MemoizationPhase extends TransformationPhase {
       val newFun = new FunDef(
         id = fn.id.freshen, 
         freshTpParams map TypeParameterDef, // FIXME TYPE PARAMS
-        returnType = typeParamSubst( (tparamIds map TypeParameter zip freshTpParams).toMap)(fn.returnType) , // This is correct only with side-effects
+        returnType = instantiateType(fn.returnType, (classDef.tparams zip freshTpParams).toMap), // This is correct only with side-effects
         params = Seq(newArg)
       )
       // The object whose field we select is an application of fieldExtractor on newArg
@@ -227,7 +226,7 @@ object MemoizationPhase extends TransformationPhase {
 
     // Add all memoized functions from top of the tree as fields
     def enrichClassDef() {
-      val freshTpParams = for (id <- tparamIds) yield TypeParameter(id.freshen)
+      val freshTpParams = freshenClassDefTpParams()
       val allExtraFields = for (Some(cc) <- collectFromTop(_.extraField)) yield {  
         val newId = idToFreshLowerCase(cc.id)
         new ValDef(newId, CaseClassType(cc, freshTpParams ) ) //FIXME
@@ -262,8 +261,8 @@ object MemoizationPhase extends TransformationPhase {
       }
 
       val funsValsMap = (extraFuns.flatten zip assignedToVals.flatten).toMap 
-      val freshTpParams = for (id <- tparamIds) yield TypeParameter(id.freshen)
-
+      
+      val freshTpParams = freshenClassDefTpParams()
       
       // Take an expression and isolate the case relevant for this constructor function
       // funArg is the argument of the original function
@@ -483,14 +482,15 @@ object MemoizationPhase extends TransformationPhase {
                   "Memoizing " + fun.id.name + " would lead to multiple/unlimited unfolding of " + funDef.id.name
                 )
               } else {
-                // Unfold funDef once (replace formal with real args)
-                Some( replaceFromIDs(funDef.params.map{_.id}.zip(realArgs).toMap, funDef.body.get) )
+                // Unfold funDef once (replace formal params. with real)
+                val unfolded = replaceFromIDs(funDef.params.map{_.id}.zip(realArgs).toMap, funDef.body.get)
+                // Replace formal type parameters with actual
+                val theMap = (funDef.tparams zip tfd.tps).toMap
+                Some (instantiateType(unfolded,theMap,Map()))
               }
-
             }
           }
 
-          case IfExpr(cond,thenn, elze) => None // Fixme: we may have to drop a branch, as in match
           case CaseClassInstanceOf(cc, Variable(vr)) if (vr == funArg) =>
             // TODO: Why only caseclass?
             Some(BooleanLiteral(cc.classDef == classDef)) 
@@ -525,7 +525,12 @@ object MemoizationPhase extends TransformationPhase {
       val assignedExprs : Seq[Seq[Expr]] = extraFuns map { 
         _ map { fun =>
           assert(fun.hasImplementation)
-          preMap(isolateRelevantCases(fun,args), true)(fun.body.get) 
+          // First, instantiate function parameters in the function body
+          val theMap = ( for( (tparamDef ,fresh) <- fun.tparams zip freshTpParams ) yield { 
+            ( tparamDef, fresh ) 
+          }).toMap
+          val withFreshTypes = instantiateType(fun.body.get, theMap, Map()) 
+          preMap(isolateRelevantCases(fun,args), true)(withFreshTypes) 
         }
       }
 
@@ -547,7 +552,7 @@ object MemoizationPhase extends TransformationPhase {
           val (noPreds, hasPreds) = toPreds.partition { _._2.isEmpty }
           if (noPreds.isEmpty) {
             if (hasPreds.isEmpty) done else throw new IllegalArgumentException(
-              "Functions:\n" ++ (noPreds mkString "\n" ) ++ "\nare involved in circular definition!" 
+              s"Functions:\n ${noPreds mkString "\n"} \nare involved in circular definition!" 
             )
           } 
           else {
@@ -557,6 +562,7 @@ object MemoizationPhase extends TransformationPhase {
         }
         tSort(toPreds, Seq()).reverse
       }
+      
       val valsWithExprs : Seq[(Identifier, Expr)] = assignedToVals.flatten zip assignedExprs.flatten
       val edges : Map[(Identifier,Expr),Set[(Identifier,Expr)]] = ( for ( (vl1, expr1) <- valsWithExprs) yield {
         (vl1, expr1) -> (valsWithExprs collect { 
@@ -587,7 +593,8 @@ object MemoizationPhase extends TransformationPhase {
       )
       
       res. body = Some(body)
-      Some(res)
+      
+      Some(res) 
     }
 
 
@@ -667,7 +674,7 @@ object MemoizationPhase extends TransformationPhase {
   private def replaceConstructors(constructorMap : Map[CaseClassDef, FunDef])(expr : Expr) : Option[Expr] = expr match {
     case CaseClass(classTp, args) => constructorMap get classTp.classDef match {
       case None         => None 
-      case Some(constr) => Some( new FunctionInvocation(constr.typed(constr.tparams map { _.tp } ), args) ) //FIXME
+      case Some(constr) => Some( new FunctionInvocation(constr.typed(classTp.tps), args) ) //FIXME
     }
     case _ => None
   }
@@ -686,7 +693,7 @@ object MemoizationPhase extends TransformationPhase {
       memoFunsMap get tfd.fd match {
         case None        => None
         case Some(newFn) => 
-          Some(FunctionInvocation(newFn.typed(newFn.tparams map { _.tp }),args)) //FIXME
+          Some(FunctionInvocation(newFn.typed(tfd.tps),args)) //FIXME
       }
     
     case me : MatchExpr => 
@@ -807,13 +814,13 @@ object MemoizationPhase extends TransformationPhase {
     
     // Apply both transformations on a funDef, parametrized by constructorMap (because we use different ones)
     def replaceAll(conMap: Map[CaseClassDef, FunDef]) = 
-      (preMapOnFunDef(replaceFunsAndPatternMatching(memoFunsMap))(_)) andThen
-      (preMapOnFunDef(replaceConstructors(conMap))(_))
+      (preMapOnFunDef(replaceFunsAndPatternMatching(memoFunsMap)) _ ) andThen
+      (preMapOnFunDef(replaceConstructors(conMap)) _ )
     
     // New non-memo functions, compatible with new types function
     val newNonMemoFuns = nonMemoFuns map replaceAll(constructorMap)
     
-    // Currently no values allowed in toplevel, so nothing to do with them
+    // Currently no values allowed in top level, so nothing to do with them FIXME
 
     val newClasses = defTrees flatMap { _.newClasses }
     val newFuns = for (

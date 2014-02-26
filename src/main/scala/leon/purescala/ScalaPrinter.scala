@@ -395,9 +395,9 @@ class ScalaPrinter(opts: PrinterOptions, sb: StringBuffer = new StringBuffer) ex
             sb.append("}")
 
           case Some((id, postc)) =>
-            sb.append("} ensuring { ")
-            pp(Variable(id), p)
-            sb.append(" => ")
+            sb.append("} ensuring { (")
+            ppBinary(Variable(id), fd.returnType, " : ")
+            sb.append(") => ")
             pp(postc, p)
             sb.append(" }")
         }

@@ -708,7 +708,7 @@ object MemoizationPhase extends TransformationPhase {
           val howManyExtraFields = caseClassDef.classDef.fields.length - subPatterns.length
           val newSubPatterns = (subPatterns map fixPattern) ++
             Seq.fill(howManyExtraFields){ WildcardPattern(None) }
-          somethingChanged = howManyExtraFields > 0
+          somethingChanged = (somethingChanged || howManyExtraFields > 0)
           CaseClassPattern(
             binder, 
             caseClassDef, 
@@ -814,8 +814,8 @@ object MemoizationPhase extends TransformationPhase {
     
     // Apply both transformations on a funDef, parametrized by constructorMap (because we use different ones)
     def replaceAll(conMap: Map[CaseClassDef, FunDef]) = 
-      (preMapOnFunDef(replaceFunsAndPatternMatching(memoFunsMap)) _ ) andThen
-      (preMapOnFunDef(replaceConstructors(conMap)) _ )
+      (preMapOnFunDef(replaceFunsAndPatternMatching(memoFunsMap),true) _ ) andThen
+      (preMapOnFunDef(replaceConstructors(conMap),true) _ )
     
     // New non-memo functions, compatible with new types function
     val newNonMemoFuns = nonMemoFuns map replaceAll(constructorMap)

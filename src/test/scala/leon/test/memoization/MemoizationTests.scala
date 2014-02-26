@@ -3,19 +3,20 @@
 package leon.test.memoization
 
 import leon._
-import leon.purescala.PrettyPrinter
-import leon.purescala.Definitions._
-import leon.purescala.Trees._
-import leon.purescala.TypeTrees._
-import leon.purescala.TreeOps._
-import leon.purescala.Common._
-import leon.memoization._
-import org.scalatest._
-import utils._
 
-import leon.evaluators._
-import leon.evaluators.EvaluationResults._
-import leon.codegen.CodeGenParams
+import purescala.Definitions._
+import purescala.Trees._
+import purescala.TypeTrees._
+import purescala.Common._
+import memoization._
+
+import verification.AnalysisPhase
+
+import utils.{DebugSectionMemoization}
+
+import evaluators.{CodeGenEvaluator, EvaluationResults}
+import evaluators.EvaluationResults._
+import codegen.CodeGenParams
 
 import org.scalatest.matchers.ShouldMatchers._
 
@@ -27,11 +28,11 @@ object MemoTestOptions {
   val testMemo            = true  // Test memoization transformation (all meaningful tests)
   val testOutputValidity  = true  // Test if output file is valid (Pure)Scala
   val testWithVerify      = true  // Verify programs and only memoize unproven functions
-  val testOutputs         = true  // See if program outputs match + performance
-  val testOriginalOut     = true // False to test only new, if original is too slow
-  val applyTransform      = false  // Apply memo transform (false if you have outputs)
-  val testInc             = false // Test incremental benchmarks
-  val testBulk            = true // Test bulk benchmarks
+  val testOutputs         = false  // See if program outputs match + performance
+  val testOriginalOut     = true  // False to test only new, if original is too slow
+  val applyTransform      = true  // Apply memo transform (false if you have outputs)
+  val testInc             = true  // Test incremental benchmarks
+  val testBulk            = true  // Test bulk benchmarks
 
   class HowToTest extends Enumeration
   case object Incremental extends HowToTest // e.g. insertions, one after the other
@@ -39,7 +40,7 @@ object MemoTestOptions {
 }
 
 
-class MemoizationTest extends leon.test.LeonTestSuite {
+class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources/", "target/scala-2.10/test-classes/resources/") {
 
  
   // Define expressions which define CaseClass expression equality correctly
@@ -61,7 +62,7 @@ class MemoizationTest extends leon.test.LeonTestSuite {
     case (ArrayType(base1)    , ArrayType(base2) )  => looseTypeEq(base1, base2)
     case (AbstractClassType(c1, _), AbstractClassType(c2, _)) => c1.id.name == c2.id.name // FIXME
     case (CaseClassType(c1, _),     CaseClassType(c2,_)) => c1.id.name == c2.id.name
-    case _ => false 
+     
   }
 
 
@@ -202,7 +203,6 @@ class MemoizationTest extends leon.test.LeonTestSuite {
   val pipeFront = frontends.scalac.ExtractionPhase andThen utils.SubtypingPhase 
   val inputFilePath  = "regression/memoization/original"
   val outputFilePath = "regression/memoization/memoOut"
-  val testFilePath   = "regression/memoization/tests"
 
   val testSizesAndRepetitions = Seq( 
     (2000,12)
@@ -211,7 +211,7 @@ class MemoizationTest extends leon.test.LeonTestSuite {
   private def testMemo(f : File, how : MemoTestOptions.HowToTest) { 
     import MemoTestOptions._
 
-    val outFileName = resourceDir(outputFilePath).getAbsolutePath() ++ "/" ++ {
+    val outFileName = outputDir(outputFilePath).getAbsolutePath() ++ "/" ++ {
       how match {
         case MemoTestOptions.Incremental => "incremental"
         case MemoTestOptions.Bulk        => "bulk"
@@ -233,9 +233,9 @@ class MemoizationTest extends leon.test.LeonTestSuite {
       val transAST = if (applyTransform) { 
         ctx.reporter.info("Applying transformation")
         val pipeline = if (testWithVerify) {
-          verification.AnalysisPhase andThen memoization.ExcludeVerifiedPhase andThen memoization.MemoizationPhase
+          AnalysisPhase andThen ExcludeVerifiedPhase andThen MemoizationPhase
         } else {
-          memoization.MemoizationPhase
+          MemoizationPhase
         }
         (pipeFront andThen pipeline).run(ctx)(f.getAbsolutePath :: Nil)
       } else {

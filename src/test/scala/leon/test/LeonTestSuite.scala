@@ -122,7 +122,7 @@ trait LeonTestSuite extends FunSuite with Timeouts {
     }
   }
 
-  private val all : String=>Boolean = (s : String) => true
+  protected val all : String=>Boolean = (s : String) => true
 
   def filesInResourceDir(dir : String, filter : String=>Boolean = all) : Iterable[File] = {
     import scala.collection.JavaConversions._

@@ -102,7 +102,7 @@ object TypeTreeOps {
     }
   }
 
-  def typeParamSubst(map: Map[TypeParameter, TypeTree])(tpe: TypeTree): TypeTree = tpe match {
+  private def typeParamSubst(map: Map[TypeParameter, TypeTree])(tpe: TypeTree): TypeTree = tpe match {
     case (tp: TypeParameter) => map.getOrElse(tp, tp)
     case NAryType(tps, builder) => builder(tps.map(typeParamSubst(map)))
   }

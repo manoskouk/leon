@@ -3,18 +3,17 @@
 package leon.memoization
 
 import leon._
+
 import utils._
 
-import purescala.Definitions._
-import purescala.TypeTrees._
-import purescala.TypeTreeOps._
-import purescala.Trees._
-import purescala.TreeOps._
 import purescala.Common._
-import purescala.TreeOps
+import purescala.Definitions._
+import purescala.Trees._
+import purescala.TreeOps.{variablesOf,functionCallsOf,preMap,preMapOnFunDef,replaceFromIDs}
+import purescala.TypeTrees._
+import purescala.TypeTreeOps.{typeParamSubst}
 
-import verification.VerificationReport
-import verification.VerificationCondition
+import verification.{VerificationReport,VerificationCondition}
 
 
 object MemoizationPhase extends TransformationPhase {

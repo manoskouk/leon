@@ -1,18 +1,19 @@
 /* Copyright 2009-2013 EPFL, Lausanne */
 
-package leon
-package memoization
+package leon.memoization
 
 import leon._
-import leon.utils._
-import purescala.Definitions._
-import purescala.TypeTrees._
-import purescala.TreeOps._
-import purescala.Trees._
+
+import utils._
+
 import purescala.Common._
-import verification.VerificationReport
-import verification.VerificationCondition
-import verification.VCKind
+import purescala.Definitions._
+import purescala.Trees._
+import purescala.TreeOps.{functionCallsOf,preMap,preMapOnFunDef}
+import purescala.TypeTrees._
+
+import verification.{VerificationReport,VerificationCondition,VCKind}
+
 
 object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
 

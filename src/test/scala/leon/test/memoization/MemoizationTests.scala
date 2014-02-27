@@ -16,7 +16,7 @@ import utils.{DebugSectionMemoization}
 
 import evaluators.{CodeGenEvaluator, EvaluationResults}
 import evaluators.EvaluationResults._
-import codegen.CodeGenParams
+import codegen.{CodeGenParams,CompilationUnit}
 
 import org.scalatest.matchers.ShouldMatchers._
 
@@ -205,12 +205,85 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
   val outputFilePath = "regression/memoization/memoOut"
 
   val testSizesAndRepetitions = Seq( 
-    (2000,12)
+    (20,12)
   )
 
+  
+  
+  
   private def testMemo(f : File, how : MemoTestOptions.HowToTest) { 
     import MemoTestOptions._
 
+    def compileTestFun(p : Program ,ctx : LeonContext) : (Expr, (Expr, Int) => EvaluationResults.Result) = {
+      // We want to produce code that checks contracts
+      val evaluator = new CodeGenEvaluator(ctx, p , CodeGenParams(checkContracts = true))
+      how match { 
+        case MemoTestOptions.Incremental => {
+          // Incremental have two functions: 
+          // init() : structure, which gives the initial value (Nil etc)
+          // test(structure,element) : structure, which is the incremental test operation (insert etc)
+          val testFun =  p.definedFunctions.find(_.id.name == "test").getOrElse {
+            ctx.reporter.fatalError("Test function not defined!")
+          }
+          val initVal = p.definedFunctions.find(_.id.name == "init").getOrElse {
+            ctx.reporter.fatalError("Initial value not defined!")
+          }.body.get
+
+          val params = testFun.params map { _.id }
+          val body = testFun.body.get
+
+          // Will apply test a number of times with the help of compileRec
+          (
+            initVal, evaluator.compileRec(body, params).getOrElse{
+              ctx.reporter.fatalError("Failed to compile test function!")
+            }
+          )
+        }
+
+        case MemoTestOptions.Bulk => {
+          // Bulk benchmarks have 3 functions: 
+          // init() : structure , which gives the initial value (Nil etc)
+          // simpleInsert(structure, element) : structure , which is the trivial insertion (e.g. cons)
+          // test(structure), which is the bulk operation we will test (e.g. sort)
+
+
+          val evaluator = new CodeGenEvaluator(ctx, p , CodeGenParams(checkContracts = true))
+          val testFun =  p.definedFunctions.find(_.id.name == "test").getOrElse {
+            ctx.reporter.fatalError("Test function not defined!")
+          }
+          val initVal = p.definedFunctions.find(_.id.name == "init").getOrElse {
+            ctx.reporter.fatalError("Initial value not defined!")
+          }.body.get
+          val simpleInsert = p.definedFunctions.find(_.id.name == "simpleInsert").getOrElse {
+            ctx.reporter.fatalError("simpleInsert function not defined!")
+          }
+
+
+          val args = simpleInsert.params map { _.id }
+          val body = simpleInsert.body.get
+
+          val construct = evaluator.compileRec(body, args).getOrElse{
+            ctx.reporter.fatalError("Failed to compile simpleInsert function!")
+          }
+          val test = evaluator.compile(testFun.body.get, testFun.params.map{_.id}).getOrElse{
+            ctx.reporter.fatalError("Failed to compile test function!")
+          }
+
+          // The complete function will construct a structure with compileRec, then apply 
+          // the test operation with compile
+          def complete(init: Expr, howMany : Int) : EvaluationResults.Result = 
+            construct(init,howMany) match {
+              case Successful(ex) => test(Seq(ex))
+              case err : RuntimeError => err
+              case err : EvaluatorError => err
+            }
+
+          (initVal, complete)
+        }
+      }
+    }
+    
+    
     val outFileName = outputDir(outputFilePath).getAbsolutePath() ++ "/" ++ {
       how match {
         case MemoTestOptions.Incremental => "incremental"
@@ -237,7 +310,11 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
         } else {
           MemoizationPhase
         }
-        (pipeFront andThen pipeline).run(ctx)(f.getAbsolutePath :: Nil)
+        val res = (pipeFront andThen pipeline).run(ctx)(f.getAbsolutePath :: Nil)
+        // Make sure you made a legal AST
+        ctx.reporter.info("Trying to compile final program to bytecode...")
+        new CompilationUnit(ctx,res,CodeGenParams(checkContracts = true)).compileModule(res.modules.head) // FIXME this has to change later
+        res
       } else {
         ctx.reporter.info("Compiling transformed from source")
         val ctx1 = ctx.copy(reporter = new DefaultReporter(settings))
@@ -260,79 +337,12 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
       
       if (testOutputs) {
 
-        def compileTestFun(p : Program) : (Expr, (Expr, Int) => EvaluationResults.Result) = {
-          // We want to produce code that checks contracts
-          val evaluator = new CodeGenEvaluator(ctx, p , CodeGenParams(checkContracts = true))
-          how match { 
-            case MemoTestOptions.Incremental => {
-              // Incremental have two functions: 
-              // init() : structure, which gives the initial value (Nil etc)
-              // test(structure,element) : structure, which is the incremental test operation (insert etc)
-              val testFun =  p.definedFunctions.find(_.id.name == "test").getOrElse {
-                ctx.reporter.fatalError("Test function not defined!")
-              }
-              val initVal = p.definedFunctions.find(_.id.name == "init").getOrElse {
-                ctx.reporter.fatalError("Initial value not defined!")
-              }.body.get
-
-              val params = testFun.params map { _.id }
-              val body = testFun.body.get
-
-              // Will apply test a number of times with the help of compileRec
-              (
-                initVal, evaluator.compileRec(body, params).getOrElse{
-                  ctx.reporter.fatalError("Failed to compile test function!")
-                }
-              )
-            }
-
-            case MemoTestOptions.Bulk => {
-              // Bulk benchmarks have 3 functions: 
-              // init() : structure , which gives the initial value (Nil etc)
-              // simpleInsert(structure, element) : structure , which is the trivial insertion (e.g. cons)
-              // test(structure), which is the bulk operation we will test (e.g. sort)
-
-
-              val evaluator = new CodeGenEvaluator(ctx, p , CodeGenParams(checkContracts = true))
-              val testFun =  p.definedFunctions.find(_.id.name == "test").getOrElse {
-                ctx.reporter.fatalError("Test function not defined!")
-              }
-              val initVal = p.definedFunctions.find(_.id.name == "init").getOrElse {
-                ctx.reporter.fatalError("Initial value not defined!")
-              }.body.get
-              val simpleInsert = p.definedFunctions.find(_.id.name == "simpleInsert").getOrElse {
-                ctx.reporter.fatalError("simpleInsert function not defined!")
-              }
-
-
-              val args = simpleInsert.params map { _.id }
-              val body = simpleInsert.body.get
-
-              val construct = evaluator.compileRec(body, args).getOrElse{
-                ctx.reporter.fatalError("Failed to compile simpleInsert function!")
-              }
-              val test = evaluator.compile(testFun.body.get, testFun.params.map{_.id}).getOrElse{
-                ctx.reporter.fatalError("Failed to compile test function!")
-              }
-
-              // The complete function will construct a structure with compileRec, then apply 
-              // the test operation with compile
-              def complete(init: Expr, howMany : Int) : EvaluationResults.Result = 
-                construct(init,howMany) match {
-                  case Successful(ex) => test(Seq(ex))
-                  case err : RuntimeError => err
-                  case err : EvaluatorError => err
-                }
-
-              (initVal, complete)
-            }
-          }
-        }
+        
 
         ctx.reporter.info("Compiling original to bytecode")
-        val (init1, compiled1) = compileTestFun(origAST)
+        val (init1, compiled1) = compileTestFun(origAST,ctx)
         ctx.reporter.info("Compiling transformed to bytecode")
-        val (init2, compiled2) = compileTestFun(transAST)
+        val (init2, compiled2) = compileTestFun(transAST,ctx)
         
 
         if (testOriginalOut) {

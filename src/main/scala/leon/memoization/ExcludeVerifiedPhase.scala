@@ -156,7 +156,7 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
     
     // Give a copy of the original program, with the new functions
     p.duplicate.copy(modules = p.modules.map { module => module.copy(defs = 
-      module.defs.filterNot { _.isInstanceOf[FunDef] } ++ finalFuns
+      module.defs.filterNot { _.isInstanceOf[FunDef] } ++ finalFuns // This multiplies functions FIXME
     )})
 
   }

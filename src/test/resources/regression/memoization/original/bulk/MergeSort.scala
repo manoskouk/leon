@@ -1,4 +1,4 @@
-import leon.Utils._
+import leon.lang._
 object MergeSort {
   sealed abstract class List
   case class Cons(head:Int,tail:List) extends List

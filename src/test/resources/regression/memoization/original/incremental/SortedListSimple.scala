@@ -1,4 +1,4 @@
-import leon.Annotations._
+import leon.annotation._
 
 object SortedListSimple {
   sealed abstract class List

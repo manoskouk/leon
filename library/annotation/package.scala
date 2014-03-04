@@ -12,5 +12,6 @@ object annotation {
   class verified   extends StaticAnnotation
   class proxy      extends StaticAnnotation
   class ignore     extends StaticAnnotation
+  class forceMemo  extends StaticAnnotation
 }
 

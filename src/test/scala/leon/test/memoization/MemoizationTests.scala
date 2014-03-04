@@ -22,22 +22,6 @@ import org.scalatest.matchers.ShouldMatchers._
 
 import java.io.{BufferedWriter, FileWriter, File}
 
-// Which tests we are performing
-object MemoTestOptions {
-  val testLooseEq         = false // Loose equality
-  val testMemo            = true  // Test memoization transformation (all meaningful tests)
-  val testOutputValidity  = true  // Test if output file is valid (Pure)Scala
-  val testWithVerify      = true  // Verify programs and only memoize unproven functions
-  val testOutputs         = false  // See if program outputs match + performance
-  val testOriginalOut     = true  // False to test only new, if original is too slow
-  val applyTransform      = true  // Apply memo transform (false if you have outputs)
-  val testInc             = true  // Test incremental benchmarks
-  val testBulk            = true  // Test bulk benchmarks
-
-  class HowToTest extends Enumeration
-  case object Incremental extends HowToTest // e.g. insertions, one after the other
-  case object Bulk        extends HowToTest // e.g. sorting, one time
-}
 
 
 class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources/", "target/scala-2.10/test-classes/resources/") {
@@ -62,7 +46,7 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
     case (ArrayType(base1)    , ArrayType(base2) )  => looseTypeEq(base1, base2)
     case (AbstractClassType(c1, _), AbstractClassType(c2, _)) => c1.id.name == c2.id.name // FIXME
     case (CaseClassType(c1, _),     CaseClassType(c2,_)) => c1.id.name == c2.id.name
-     
+    case (_, _) => false  
   }
 
 
@@ -81,7 +65,7 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
         s1 == s2
       case ( BooleanLiteral(b1), BooleanLiteral(b2) ) =>  
         b1 == b2
-      case ( UnitLiteral, UnitLiteral ) => 
+      case ( UnitLiteral(), UnitLiteral() ) => 
         true
       case ( FiniteArray(exs1), FiniteArray(exs2) ) =>
         if (exs1.length != exs2.length) false 
@@ -298,7 +282,7 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
         // We want a reporter that actually prints some output
         reporter = new DefaultReporter(settings),
         settings = settings,
-        options =  testContext.options :+ LeonValueOption("o", outFileName) :+ LeonValueOption("timeout", timeOut.toString)
+        options =  testContext.options :+ LeonValueOption("o", outFileName) :+ LeonValueOption("timeout", timeOut.toString) :+ LeonFlagOption("library", true)
       )
 
       ctx.reporter.info("Now testing " + f.getAbsolutePath)
@@ -312,8 +296,8 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
         }
         val res = (pipeFront andThen pipeline).run(ctx)(f.getAbsolutePath :: Nil)
         // Make sure you made a legal AST
-        ctx.reporter.info("Trying to compile final program to bytecode...")
-        new CompilationUnit(ctx,res,CodeGenParams(checkContracts = true)).compileModule(res.modules.head) // FIXME this has to change later
+        //ctx.reporter.info("Trying to compile final program to bytecode...")
+        //new CompilationUnit(ctx,res,CodeGenParams(checkContracts = true)).compileModule(res.modules.head) // FIXME this has to change later
         res
       } else {
         ctx.reporter.info("Compiling transformed from source")

@@ -836,7 +836,7 @@ object MemoizationPhase extends TransformationPhase {
     // DEBUG
     newProg.writeScalaFile(outputFile)
 
-    new codegen.CompilationUnit(ctx,newProg,codegen.CodeGenParams(checkContracts = true)).compileModule(newProg.modules.head) // FIXME this has to change later
+    //new codegen.CompilationUnit(ctx,newProg,codegen.CodeGenParams(checkContracts = true)).compileModule(newProg.modules.head) // FIXME this has to change later
 
     newProg
 

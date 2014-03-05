@@ -141,17 +141,17 @@ Some advice for when using Eclipse:
 * If you want to use ScalaTest from within Eclipse, download the ScalaTest plugin. For instructions, see [here](http://www.scalatest.org/user_guide/using_scalatest_with_eclipse). 
   Do NOT declare your test packages as nested packages in separate lines, because ScalaTest won't see them for some reason. E.g. don't write 
 
-<pre>
-  package leon
-  package test
-  package myTestPackage 
-</pre>
+  <pre>
+    package leon
+    package test
+    package myTestPackage 
+  </pre>
 
-but instead
+  but instead
 
-<pre>
-  package leon.test.myTestPackage
-</pre>
+  <pre>
+    package leon.test.myTestPackage
+  </pre>
 
 Changelog
 ---------

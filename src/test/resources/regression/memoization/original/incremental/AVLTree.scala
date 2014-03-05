@@ -4,8 +4,8 @@
  * Date: 20.11.2013
  **/
 
-import leon.lang._
-import leon.annotation._ 
+import leon.Utils._
+import leon.Annotations._ 
 
 object AVLTree  {
   sealed abstract class Tree
@@ -251,4 +251,3 @@ object AVLTree  {
   def init() = Leaf()
 
 }
-    

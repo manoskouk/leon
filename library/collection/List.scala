@@ -72,6 +72,13 @@ sealed abstract class List[T] {
       case Cons(x,xs) => xs.reverse :+ x
     }
   } ensuring (res => (res.size == size) && (res.content == content))
+  
+  @verified
+  def isEmpty : Boolean = this match {
+    case Nil => true
+    case _   => false 
+  } 
+  
 }
 
 

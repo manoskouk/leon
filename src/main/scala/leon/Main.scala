@@ -212,9 +212,12 @@ object Main {
         xlang.XlangAnalysisPhase
       } else if (settings.memo) {
         if (settings.verify) {
-          verification.AnalysisPhase andThen memoization.ExcludeVerifiedPhase andThen memoization.MemoizationPhase
+          verification.AnalysisPhase andThen 
+          memoization.ExcludeVerifiedPhase andThen 
+          memoization.MemoizationPhase andThen 
+          utils.FileOutputPhase
         }
-        else memoization.MemoizationPhase
+        else memoization.MemoizationPhase andThen utils.FileOutputPhase
       } else if (settings.verify) {
         verification.AnalysisPhase
       } else {

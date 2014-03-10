@@ -22,8 +22,7 @@ object MemoizationPhase extends TransformationPhase {
   val description = "Transform a program into another, " + 
     "where data stuctures keep Memoization information"
   override val definedOptions : Set[LeonOptionDef] = Set( 
-    LeonFlagOptionDef("no-verify", "--no-verify", "Skip verification before memoization transformation."),
-    LeonValueOptionDef("o",        "--o=<file>",  "Output file for memoization transformation.") 
+    LeonFlagOptionDef("no-verify", "--no-verify", "Skip verification before memoization transformation.")
   )
 
   // Reporting
@@ -784,9 +783,7 @@ object MemoizationPhase extends TransformationPhase {
 
     this.ctx = ctx
 
-    // Get the output file name from command line, or use default
-    val outputFile = ( for (LeonValueOption("o", file) <- ctx.options) yield file ).lastOption.getOrElse("memo.out.scala")
-
+   
     ctx.reporter.info("Applying memoization transformation on program")
     
     val candidateFuns = findCandidateFuns(p) 
@@ -844,7 +841,6 @@ object MemoizationPhase extends TransformationPhase {
       //  preMap(replaceConstructors(constructorMap))
     )))
     // DEBUG
-    newProg.writeScalaFile(outputFile)
 
     //new codegen.CompilationUnit(ctx,newProg,codegen.CodeGenParams(checkContracts = true)).compileModule(newProg.modules.head) // FIXME this has to change later
 

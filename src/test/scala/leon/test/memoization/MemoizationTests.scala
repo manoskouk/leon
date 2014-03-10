@@ -294,9 +294,13 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
       val transAST = if (applyTransform) { 
         ctx.reporter.info("Applying transformation")
         val pipeline = if (testWithVerify) {
-          AnalysisPhase andThen ExcludeVerifiedPhase andThen MemoizationPhase
+          AnalysisPhase andThen 
+          ExcludeVerifiedPhase andThen 
+          MemoizationPhase andThen
+          utils.FileOutputPhase
         } else {
-          MemoizationPhase
+          MemoizationPhase andThen
+          utils.FileOutputPhase
         }
         val res = (pipeFront andThen pipeline).run(ctx)(f.getAbsolutePath :: Nil)
         // Make sure you made a legal AST

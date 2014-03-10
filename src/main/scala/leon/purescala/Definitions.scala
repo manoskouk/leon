@@ -15,6 +15,7 @@ object Definitions {
 
   sealed abstract class Definition extends Tree {
     val id: Identifier
+    val optEnclosing : Option[Definition]
     override def hashCode : Int = id.hashCode
     override def equals(that : Any) : Boolean = that match {
       case t : Definition => t.id == this.id
@@ -23,7 +24,7 @@ object Definitions {
   }
 
   /** A ValDef declares a new identifier to be of a certain type. */
-  case class ValDef(id: Identifier, tpe: TypeTree) extends Definition with FixedType {
+  case class ValDef(id: Identifier, tpe: TypeTree, optEnclosing : Option[Definition]) extends Definition with FixedType {
     self: Serializable =>
 
     val fixedType = tpe
@@ -40,6 +41,8 @@ object Definitions {
   /** A wrapper for a program. For now a program is simply a single object. The
    * name is meaningless and we just use the package name as id. */
   case class Program(id: Identifier, modules: List[ModuleDef]) extends Definition {
+    override val optEnclosing = None
+    
     def definedFunctions    = modules.flatMap(_.definedFunctions)
     def definedClasses      = modules.flatMap(_.definedClasses)
     def classHierarchyRoots = modules.flatMap(_.classHierarchyRoots)
@@ -77,12 +80,15 @@ object Definitions {
   }
 
   case class TypeParameterDef(tp: TypeParameter) extends Definition {
+    val optEnclosing = None
     val id = tp.id
   }
 
   /** Objects work as containers for class definitions, functions (def's) and
    * val's. */
-  case class ModuleDef(id: Identifier, defs : Seq[Definition]) extends Definition {
+  case class ModuleDef(id: Identifier, defs : Seq[Definition], enclosing : Definition) extends Definition {
+    override val optEnclosing = Some(enclosing)
+    
     lazy val definedFunctions : Seq[FunDef] = defs.collect { case fd: FunDef => fd }
 
     lazy val definedClasses : Seq[ClassDef] = defs.collect { case ctd: ClassDef => ctd }
@@ -92,20 +98,22 @@ object Definitions {
     }
 
     lazy val algebraicDataTypes : Map[AbstractClassDef, Seq[CaseClassDef]] = (defs.collect {
-      case c @ CaseClassDef(_, _, Some(p), _) => c
+      case c @ CaseClassDef(_, _, Some(p), _, _) => c
     }).groupBy(_.parent.get.classDef)
 
     lazy val singleCaseClasses : Seq[CaseClassDef] = defs.collect {
-      case c @ CaseClassDef(_, _, None, _) => c
+      case c @ CaseClassDef(_, _, None, _, _) => c
     }
 
   }
 
   /** Useful because case classes and classes are somewhat unified in some
    * patterns (of pattern-matching, that is) */
-  sealed trait ClassDef extends Definition {
+  abstract sealed class ClassDef(enclosing : Definition) extends Definition {
+    
     self =>
 
+    val optEnclosing = Some(enclosing)
     val id: Identifier
     val tparams: Seq[TypeParameterDef]
     def fields: Seq[ValDef]
@@ -157,7 +165,8 @@ object Definitions {
   /** Abstract classes. */
   case class AbstractClassDef(val id: Identifier,
                               val tparams: Seq[TypeParameterDef],
-                              val parent: Option[AbstractClassType]) extends ClassDef {
+                              val parent: Option[AbstractClassType],
+                              val enclosing : Definition) extends ClassDef(enclosing) {
 
     val fields = Nil
     val isAbstract   = true
@@ -169,8 +178,9 @@ object Definitions {
       val id: Identifier,
       val tparams: Seq[TypeParameterDef],
       val parent: Option[AbstractClassType],
+      val enclosing : Definition,
       private var _isCaseObject: Boolean
-  ) extends ClassDef {
+  ) extends ClassDef(enclosing) {
 
     def isCaseObject = _isCaseObject
     
@@ -199,18 +209,28 @@ object Definitions {
   }
 
   /** Functions (= 'methods' of objects) */
-  case class FunDef(val id: Identifier, val tparams: Seq[TypeParameterDef], val returnType: TypeTree, val params: Seq[ValDef]) extends Definition {
+  case class FunDef(
+      val id: Identifier, 
+      val tparams: Seq[TypeParameterDef], 
+      val returnType: TypeTree, 
+      val params: Seq[ValDef],
+      val enclosing : Definition 
+  ) extends Definition {
+    
+    val optEnclosing = Some(enclosing)
     var body: Option[Expr] = None
     def implementation : Option[Expr] = body
     var precondition: Option[Expr] = None
     var postcondition: Option[(Identifier, Expr)] = None
 
+    def isClassMethod = enclosing.isInstanceOf[ClassDef]
+    
     // Metadata kept here after transformations
     var parent: Option[FunDef] = None
     var orig: Option[FunDef] = None
 
     def duplicate: FunDef = {
-      val fd = new FunDef(id, tparams, returnType, params)
+      val fd = new FunDef(id, tparams, returnType, params, enclosing)
       fd.body = body
       fd.precondition = precondition
       fd.postcondition = postcondition
@@ -251,6 +271,8 @@ object Definitions {
       TypedFunDef(this, Nil)
     }
 
+    def m2f(newEnclosing : Definition) = this.copy(enclosing = newEnclosing).copyContentFrom(this)
+    
   }
 
 
@@ -279,11 +301,11 @@ object Definitions {
         (fd.params, Map())
       } else {
         val newParams = fd.params.map {
-          case vd @ ValDef(id, tpe) =>
+          case vd @ ValDef(id, tpe, _) =>
             val newTpe = translated(tpe)
             val newId = FreshIdentifier(id.name, true).setType(newTpe).copiedFrom(id)
 
-            ValDef(newId, newTpe).setPos(vd)
+            ValDef(newId, newTpe, None).setPos(vd)
         }
 
         val paramsMap: Map[Identifier, Identifier] = (fd.params zip newParams).map { case (vd1, vd2) => vd1.id -> vd2.id }.toMap

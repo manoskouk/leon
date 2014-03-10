@@ -840,10 +840,7 @@ object MemoizationPhase extends TransformationPhase {
       //  preMap(replaceFunsAndPatternMatching(memoFunsMap)) map 
       //  preMap(replaceConstructors(constructorMap))
     )))
-    // DEBUG
-
-    //new codegen.CompilationUnit(ctx,newProg,codegen.CodeGenParams(checkContracts = true)).compileModule(newProg.modules.head) // FIXME this has to change later
-
+ 
     newProg
 
   }

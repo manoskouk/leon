@@ -7,7 +7,8 @@ import utils._
 
 object Common {
   import Trees.Variable
-  import TypeTrees.Typed
+  import TypeTrees._
+  import Definitions._
 
   abstract class Tree extends Positioned with Serializable {
     def copiedFrom(o: Tree): this.type = {
@@ -59,6 +60,7 @@ object Common {
 
     def freshen: Identifier = FreshIdentifier(name, alwaysShowUniqueID).copiedFrom(this)
   }
+  
 
   private object UniqueCounter {
     private var globalId = -1
@@ -80,6 +82,20 @@ object Common {
 
     def apply(name: String, forceId: Int): Identifier = new Identifier(name, UniqueCounter.nextGlobal, forceId, true)
 
+  }
+  
+  class ThisIdentifier private[Common] (val cc : ClassDef, private val globalId: Int, override val id : Int, alwaysShowUniqueID: Boolean = false) 
+    extends Identifier ("this", globalId, id, alwaysShowUniqueID) with FixedType {
+
+    override val fixedType = classDefToClassType(cc)
+
+  }
+  
+  object FreshThisId  {
+    def apply(cc : ClassDef, alwaysShowUniqueID: Boolean = false) : ThisIdentifier = 
+      new ThisIdentifier(cc, UniqueCounter.nextGlobal, UniqueCounter.next("this"), alwaysShowUniqueID)
+    def apply(cc : ClassDef, forceId: Int): ThisIdentifier = 
+      new ThisIdentifier(cc, UniqueCounter.nextGlobal, forceId, true)
   }
 
 }

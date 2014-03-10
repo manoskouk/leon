@@ -237,7 +237,7 @@ class VanuatooDataGen(ctx: LeonContext, p: Program) extends DataGenerator {
     var found = Set[Seq[Expr]]()
 
     /**
-     * Gather at most <n> isomoprhic models  before skipping them
+     * Gather at most <n> isomorphic models  before skipping them
      * - Too little means skipping many excluding patterns
      * - Too large means repetitive (and not useful models) before reaching maxEnumerated
      */

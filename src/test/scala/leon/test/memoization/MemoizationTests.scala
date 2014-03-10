@@ -286,7 +286,7 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
         // We want a reporter that actually prints some output
         reporter = new DefaultReporter(settings),
         settings = settings,
-        options =  testContext.options :+ LeonValueOption("o", outFileName) :+ LeonValueOption("timeout", timeOut.toString) :+ LeonFlagOption("library", true)
+        options =  LeonFlagOption("library", true) +: (testContext.options :+ LeonValueOption("o", outFileName) :+ LeonValueOption("timeout", timeOut.toString))
       )
 
       ctx.reporter.info("Now testing " + f.getAbsolutePath)

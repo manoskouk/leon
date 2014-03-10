@@ -17,7 +17,7 @@ import datagen._
 class EnumerationSolver(val context: LeonContext, val program: Program) extends Solver with Interruptible {
   def name = "Enum"
 
-  val maxTried = 10000;
+  val maxTried = 1000000;
 
   var datagen: Option[DataGenerator] = None
 

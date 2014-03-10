@@ -104,11 +104,11 @@ object RedBlackTree {
     makeBlack(ins(x, t))
   } ensuring (res => content(res) == content(t) ++ Set(x) && redNodesHaveBlackChildren(res) && blackBalanced(res) && orderedKeys(res))
   
-//  def buggyAdd(x: Int, t: Tree): Tree = {
-//    require(redNodesHaveBlackChildren(t))
-//    // makeBlack(ins(x, t))
-//    ins(x, t)
-//  } ensuring (res => content(res) == content(t) ++ Set(x) && redNodesHaveBlackChildren(res))
+  def buggyAdd(x: Int, t: Tree): Tree = {
+    require(redNodesHaveBlackChildren(t))
+    // makeBlack(ins(x, t))
+    ins(x, t)
+  } ensuring (res => content(res) == content(t) ++ Set(x) && redNodesHaveBlackChildren(res))
   
   def balance(c: Color, a: Tree, x: Int, b: Tree): Tree = {
     require(orderedKeys(a, None(), Some(x)) && orderedKeys(b, Some(x), None()))

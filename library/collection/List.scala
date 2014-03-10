@@ -75,7 +75,7 @@ sealed abstract class List[T] {
   
   @verified
   def isEmpty : Boolean = this match {
-    case Nil => true
+    case Nil() => true
     case _   => false 
   } 
   
@@ -119,6 +119,18 @@ object ListSpecs {
   }.holds
 
   @verified
+  def appendNeutral[T](l : List[T]) : Boolean = {
+    Nil() ++ l == l && 
+    (
+      l match {
+        case Nil() => true 
+        case Cons(x,xs) => appendNeutral(xs)
+      }      
+    ) &&
+    l ++ Nil() == l
+  } holds 
+  
+  @verified 
   def appendAssoc[T](l1 : List[T], l2 : List[T], l3 : List[T]) : Boolean = {
     (l1 match {
       case Nil() => true

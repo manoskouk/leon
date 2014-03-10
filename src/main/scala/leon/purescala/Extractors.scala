@@ -191,7 +191,7 @@ object Extractors {
     def extract: Option[(Seq[Expr], (Seq[Expr])=>Expr)];
   }
 
-  object TopLevelOrs { // expr1 AND (expr2 AND (expr3 AND ..)) => List(expr1, expr2, expr3)
+  object TopLevelOrs { // expr1 OR (expr2 OR (expr3 OR ..)) => List(expr1, expr2, expr3)
     def unapply(e: Expr): Option[Seq[Expr]] = e match {
       case Or(exprs) =>
         Some(exprs.flatMap(unapply(_)).flatten)

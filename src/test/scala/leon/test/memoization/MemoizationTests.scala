@@ -184,7 +184,11 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
     } 
   }
 
-  val pipeFront = frontends.scalac.ExtractionPhase andThen utils.SubtypingPhase 
+  val pipeFront = 
+    frontends.scalac.ExtractionPhase andThen
+    purescala.MethodLifting andThen
+    utils.SubtypingPhase andThen
+    purescala.CompleteAbstractDefinitions 
   val inputFilePath  = "regression/memoization/original"
   val outputFilePath = "regression/memoization/memoOut"
 

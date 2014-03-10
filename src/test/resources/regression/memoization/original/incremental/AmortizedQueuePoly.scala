@@ -1,15 +1,14 @@
-// reverse is not implemented tail-recursively! :(
+/* Copyright 2009-2013 EPFL, Lausanne */
 
-// Problems : content
-
+import leon._
 import leon.lang._
 import leon.annotation._
 import leon.collection._
-import leon._
 
 
 case class AmortizedQueue[A](private val front : List[A], private val rear : List[A]) {
   import AmortizedQueueOps._
+  import ListSpecs._
 
   def size : Int = { front.size + rear.size } ensuring ( _ >= 0 )
   
@@ -18,7 +17,10 @@ case class AmortizedQueue[A](private val front : List[A], private val rear : Lis
   def isEmpty : Boolean = { (front,rear) match {
     case (Nil(), Nil()) => true
     case _ => false
-  }} ensuring ( _ == this.toList.isEmpty )
+  }} ensuring { res =>
+    res == this.toList.isEmpty &&
+    res == (this.content == Set[A]())
+  }
 
   def toList : List[A] = {
     front ++ rear.reverse
@@ -28,10 +30,11 @@ case class AmortizedQueue[A](private val front : List[A], private val rear : Lis
 
   def enqueue(elem : A) : AmortizedQueue[A] =  {
     amortizedQueue(front, Cons(elem, rear))
-  } ensuring ( res => 
-    res.isAmortized && 
-    res.toList == this.toList :+ elem
-  )
+  } ensuring ( res => res.isAmortized && {
+    if (snocReverse(rear.reverse, elem) && reverseReverse(rear)) { //proof
+      res.toList == this.toList :+ elem
+    } else false
+  })
 /*
   def push(elem : A) : AmortizedQueue[A] = {
     amortizedQueue(Cons(elem,front), rear)
@@ -63,14 +66,23 @@ case class AmortizedQueue[A](private val front : List[A], private val rear : Lis
     q.isAmortized && Cons(f, q.toList) == this.toList
   }
 
-  def headOption : Option[A]        = if (!isEmpty) Some(this.head) else None()
-  def tailOption : Option[AmortizedQueue[A]] = if (!isEmpty) Some(this.tail) else None()
+  def headOption : Option[A] = {
+    require(isAmortized)
+    if (!isEmpty) Some(this.head) else None()
+  }
+  
+  def tailOption : Option[AmortizedQueue[A]] = {
+    require(isAmortized)
+    if (!isEmpty) Some(this.tail) else None()
+  }
 
 }
 
 
 object AmortizedQueueOps {
-
+  
+  import ListSpecs._
+  
   def emptyQueue[T]() : AmortizedQueue[T] = AmortizedQueue[T](Nil[T](), Nil[T]())
 
   def amortizedQueue[A](front : List[A], rear : List[A]) : AmortizedQueue[A] = {
@@ -78,10 +90,11 @@ object AmortizedQueueOps {
       AmortizedQueue(front, rear)
     else
       AmortizedQueue(front ++ rear.reverse, Nil[A]())
-  } ensuring ( res => 
-    res.isAmortized && 
-    AmortizedQueue(front, rear).toList == res.toList
-  )
+  } ensuring ( res => res.isAmortized && {
+    if (appendAssoc(front,rear.reverse,Nil()) && appendNeutral(front ++ rear.reverse))  // proof
+      res.toList == front ++ rear.reverse && AmortizedQueue(front, rear).toList == res.toList
+    else false
+  })
 
   
 

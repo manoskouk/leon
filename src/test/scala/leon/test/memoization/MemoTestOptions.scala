@@ -5,11 +5,11 @@ object MemoTestOptions {
   val testLooseEq         = false // Loose equality
   val testMemo            = true  // Test memoization transformation (all meaningful tests)
   val testOutputValidity  = true  // Test if output file is valid (Pure)Scala
-  val testWithVerify      = true  // Verify programs and only memoize unproven functions
+  val testWithVerify      = false  // Verify programs and only memoize unproven functions
   val testOutputs         = false  // See if program outputs match + performance
   val testOriginalOut     = true  // False to test only new, if original is too slow
   val applyTransform      = true  // Apply memo transform (false if you have outputs)
-  val testInc             = false  // Test incremental benchmarks
+  val testInc             = true  // Test incremental benchmarks
   val testBulk            = true  // Test bulk benchmarks
 
   class HowToTest extends Enumeration

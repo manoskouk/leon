@@ -4,8 +4,9 @@
  * Date: 20.11.2013
  **/
 
-import leon.Utils._
-import leon.Annotations._ 
+import leon.lang._
+import leon.annotation._ 
+import leon.collection._
 
 object AVLTree  {
   sealed abstract class Tree

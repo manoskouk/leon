@@ -33,7 +33,7 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
    * and shortcuts the precondition if this is true
    */
   
-  def withOptionalPrecondition(funDef : FunDef ) = {
+  def withExpandedPrecondition(funDef : FunDef ) = {
     
     // To the function definition itself, add an extra argument if it has precon.
     // that says if it has been verified.
@@ -119,18 +119,19 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
       _.getPos
     }.toSeq.sortWith { (x1,x2) => x1._1 < x2._1 }
     
-    // To function invocations with preconditions, add an extra argument saying if it is verified or not
-    val functionCallMap : Map[Expr, Expr] = ( 
-      for ( (fi@FunctionInvocation(funDef,args), pc) <- funCalls zip verifiedPrecons ) yield {
-        ( fi, FunctionInvocation(
-          funDef, 
-          args :+ BooleanLiteral( pc._2 forall { _.value == Some(true)} )
-        ))
+    /**
+     * Map function invocations with preconditions to the result of their precondition verification
+     */  
+    val functionVerifiedStatusMap : Map[FunctionInvocation, Boolean] = ( 
+      for ( (fi, pc) <- funCalls zip verifiedPrecons ) yield {
+        val isVerified = pc._2 forall { _.value == Some(true)} 
+        ( fi, isVerified ) 
       }
     ).toMap
  
     
-    val toRet = withOptionalPrecondition(funDef)
+    
+    val toRet = withExpandedPrecondition(funDef)
     
     
     toRet.postcondition = finalPostcons.length match {
@@ -139,7 +140,15 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
       case _ => Some( (postCons._1, And(finalPostcons)) )
     }
 
-    preMapOnFunDef(functionCallMap.get, true) (toRet)
+    // Add the extra field to all function calls with precond.
+    def addExtraField(e : Expr) = e match {
+      case fi@FunctionInvocation(tfd, args) if tfd.fd.hasPrecondition => {
+        // By default, we consider a precond. not proven (we need this because conditions inside conditions are not checked)
+        Some(FunctionInvocation(tfd, args :+ BooleanLiteral(functionVerifiedStatusMap.getOrElse(fi,false))))
+      }      
+      case _ => None
+    }
+    preMapOnFunDef(addExtraField, false) (toRet)
   
   }
   
@@ -149,7 +158,7 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
    * and marks all function invocations with precond. as unproven 
    */
   private def processNotVerified(funDef : FunDef) : FunDef = {
-    val newFunDef = withOptionalPrecondition(funDef) 
+    val newFunDef = withExpandedPrecondition(funDef) 
     insertExtraArgOnFunInvocations(newFunDef, false)       
   }
   
@@ -159,7 +168,7 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
    * 
    */
   private def processWithAnnotation( funDef : FunDef ) :FunDef = {
-    val newFunDef = withOptionalPrecondition(funDef) 
+    val newFunDef = withExpandedPrecondition(funDef) 
     newFunDef.postcondition= None
     insertExtraArgOnFunInvocations(newFunDef, true)     
   }
@@ -180,23 +189,24 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
       processVerified( funDef, vRep.fvcs.get(funDef).get )
     }
          
-    
-    // Lastly, substitute all function calls in the new functions with the new functions
+    // Map old function -> new function
     val theMap = ((verified ++ notVerified ++ withAnnotation) zip (readyVerified ++ readyNotVerified ++ readyWithAnnotation)).toMap
     
+    // substitutes oldfunction -> new function
     def refreshFunInvs (e : Expr) = e match {
-      case FunctionInvocation(TypedFunDef(fd,tps),args) if theMap.contains(fd) =>
+      case FunctionInvocation(TypedFunDef(fd,tps),args) =>
         Some( FunctionInvocation(theMap.get(fd).get.typed(tps), args) )
       case _ => None 
     }
     
-    val finalFuns = for (fun <- readyVerified ++ readyNotVerified ++ readyWithAnnotation) yield {
-      preMapOnFunDef(refreshFunInvs)(fun)
-    }
-    
     // Give a copy of the original program, with the new functions
-    p.duplicate.copy(modules = p.modules.map { module => module.copy(defs = 
-      module.defs.filterNot { _.isInstanceOf[FunDef] } ++ finalFuns // This multiplies functions FIXME
+    p.duplicate.copy(modules = for (module <- p.modules) yield { 
+      val newModuleFunctions = for (fun <- module.definedFunctions) yield {
+        assert(theMap contains fun)
+        val newFun = theMap.get(fun).get
+        preMapOnFunDef(refreshFunInvs)(newFun) // 
+      }
+      module.copy(defs = module.defs.filterNot { _.isInstanceOf[FunDef] } ++ newModuleFunctions 
     )})
 
   }

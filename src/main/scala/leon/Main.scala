@@ -214,17 +214,7 @@ object Main {
         if (settings.verify) {
           verification.AnalysisPhase andThen memoization.ExcludeVerifiedPhase andThen memoization.MemoizationPhase
         }
-        else {
-          /*// If --no-verify is selected, pass an empty verification report
-          import verification.VerificationReport
-          new LeonPhase[Program,VerificationReport] { 
-            val description = ""
-            val name = ""
-            def run(ctx : LeonContext)(p : Program ) : VerificationReport = 
-              VerificationReport.emptyReport(p)
-          } andThen memoization.MemoizationPhase */
-          memoization.MemoizationPhase
-        }
+        else memoization.MemoizationPhase
       } else if (settings.verify) {
         verification.AnalysisPhase
       } else {

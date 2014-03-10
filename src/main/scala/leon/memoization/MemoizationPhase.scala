@@ -57,14 +57,7 @@ object MemoizationPhase extends TransformationPhase {
     
     // Functions which recursively call themselves with their only argument being of type classDef
     val classDefRecursiveFuns : Seq[FunDef] = candidateFuns.toSeq filter { f =>
-      f.params.head.getType.asInstanceOf[ClassType].classDef == classDef &&
-      ( 
-        // TODO : clear out what happens in these cases.   
-        if (f.returnType.isInstanceOf[ClassType]) { 
-          f.returnType.asInstanceOf[ClassType].classDef.hierarchyRoot != classDef.hierarchyRoot 
-        }
-        else true 
-      )
+      f.params.head.getType.asInstanceOf[ClassType].classDef == classDef 
     }
     val hasLocalMemoFuns = !classDefRecursiveFuns.isEmpty
     
@@ -253,7 +246,7 @@ object MemoizationPhase extends TransformationPhase {
       /**
        * Functions corresponding to the extra fields
        */ 
-      val extraFuns : Seq[Seq[FunDef]] = //FIXME
+      val extraFuns : Seq[Seq[FunDef]] = 
         collectFromTop { _.classDefRecursiveFuns } filter { !_.isEmpty }
 
       // The new vals we are going to be assigning the results of calling old function code into
@@ -480,15 +473,14 @@ object MemoizationPhase extends TransformationPhase {
               // Check for possible unlimited unrolling...
               if ( p.callGraph.isRecursive(funDef) ) {
                 ctx.reporter.fatalError(
-                  fi.getPos.toString + ":\n" +
-                  "Function " + fun.id.name + " calls recursive function " + funDef.id.name + 
-                  ", which is not memoized.\n " +
-                  "Memoizing " + fun.id.name + " would lead to multiple/unlimited unfolding of " + funDef.id.name
+                  s"${fi.getPos.toString}\n" +
+                  s"Function ${fun.id.name} calls recursive function ${funDef.id.name}, which is not memoized.\n" +
+                  s"Memoizing ${fun.id.name} would lead to multiple/unlimited unfolding of ${funDef.id.name}."
                 )
               } else {
                 // Unfold funDef once (replace formal params. with real)
                 val unfolded = replaceFromIDs(funDef.params.map{_.id}.zip(realArgs).toMap, funDef.body.get)
-                // Replace formal type parameters with actual
+                // Replace formal type parameters with real
                 val theMap = (funDef.tparams zip tfd.tps).toMap
                 Some (instantiateType(unfolded,theMap,Map()))
               }
@@ -759,11 +751,29 @@ object MemoizationPhase extends TransformationPhase {
     dbg("I found these candidates:\n" + allCandidates.map {_.id.name}.mkString("\n"))
     
     // Filter these to have the desired form
-    val toRet = allCandidates filter { f =>  
+    val recMemo = allCandidates filter { f =>  
       f.params.size == 1 &&
       f.params.head.getType.isInstanceOf[ClassType] &&
-      p.callGraph.transitivelyCalls(f,f) 
+      p.callGraph.transitivelyCalls(f,f) &&
+      ( 
+        // TODO : clear out what happens in these cases.   
+        if (f.returnType.isInstanceOf[ClassType]) { 
+          val rootRet   = f.returnType.         asInstanceOf[ClassType].classDef.hierarchyRoot 
+          val rootParam = f.params.head.getType.asInstanceOf[ClassType].classDef.hierarchyRoot 
+          rootRet != rootParam
+        }
+        else true 
+      )
     }
+    
+    // Every function that transitively calls a recursive function NOT in this list should be dropped
+    val recNotMemo = p.definedFunctions.filter{ p.callGraph.isRecursive(_) }.toSet -- recMemo.toSet
+    val toRet = recMemo -- p.callGraph.transitiveCallers(recNotMemo)
+    
+    for (fun <- recMemo -- toRet) {
+      ctx.reporter.info(s"${fun.id.name} is not considered for memoization, as it is calling a non-memoized reursive function")
+    }
+    
     dbg("I found these final candidates:\n" + toRet.map {_.id.name}.mkString("\n"))
     
     toRet 

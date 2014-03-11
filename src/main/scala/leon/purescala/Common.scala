@@ -84,17 +84,17 @@ object Common {
 
   }
   
-  class ThisIdentifier private[Common] (val cc : ClassDef, private val globalId: Int, override val id : Int, alwaysShowUniqueID: Boolean = false) 
-    extends Identifier ("this", globalId, id, alwaysShowUniqueID) with FixedType {
+  class ThisIdentifier private[Common] (val cType : ClassType, private val globalId: Int, override val id : Int, alwaysShowUniqueID: Boolean = false) 
+    extends Identifier ("this$", globalId, id, alwaysShowUniqueID) with FixedType {
 
-    override val fixedType = classDefToClassType(cc)
+    override val fixedType = cType
 
   }
   
   object FreshThisId  {
-    def apply(cc : ClassDef, alwaysShowUniqueID: Boolean = false) : ThisIdentifier = 
+    def apply(cc : ClassType, alwaysShowUniqueID: Boolean = false) : ThisIdentifier = 
       new ThisIdentifier(cc, UniqueCounter.nextGlobal, UniqueCounter.next("this"), alwaysShowUniqueID)
-    def apply(cc : ClassDef, forceId: Int): ThisIdentifier = 
+    def apply(cc : ClassType, forceId: Int): ThisIdentifier = 
       new ThisIdentifier(cc, UniqueCounter.nextGlobal, forceId, true)
   }
 

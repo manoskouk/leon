@@ -27,12 +27,13 @@ object MethodLifting extends TransformationPhase {
         val id = FreshIdentifier(cd.id.name+"$"+fd.id.name).setPos(fd.id)
         val recType = classDefToClassType(cd, ctParams.map(_.tp))
 
-        val receiver = FreshIdentifier("this$").setType(recType).setPos(cd.id)
+        val receiver = FreshThisId(recType).setPos(cd.id)
 
         val nfd = new FunDef(id, ctParams ++ fd.tparams, fd.returnType, ValDef(receiver, recType) +: fd.params)
         nfd.postcondition = fd.postcondition
         nfd.precondition  = fd.precondition
         nfd.body          = fd.body
+        nfd.enclosing     = fd.enclosing
 
         nfd.setPos(fd)
         nfd.addAnnotation(fd.annotations.toSeq : _*)

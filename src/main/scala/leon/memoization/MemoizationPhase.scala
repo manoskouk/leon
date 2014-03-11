@@ -770,7 +770,7 @@ object MemoizationPhase extends TransformationPhase {
     val toRet = recMemo -- p.callGraph.transitiveCallers(recNotMemo)
     
     for (fun <- recMemo -- toRet) {
-      ctx.reporter.info(s"${fun.id.name} is not considered for memoization, as it is calling a non-memoized reursive function")
+      ctx.reporter.info(s"${fun.id.name} is not considered for memoization, as it is calling a non-memoized recursive function")
     }
     
     dbg("I found these final candidates:\n" + toRet.map {_.id.name}.mkString("\n"))

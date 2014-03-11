@@ -47,7 +47,7 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
       } else (funDef.params, None)
 
 
-    val toRet = funDef.copy(params=newArgs) // FIXME tparams OK
+    val toRet = funDef.copy(params=newArgs).copiedFrom(funDef) // FIXME tparams OK
     toRet.copyContentFrom(funDef)
     
     toRet.precondition = newPrecon

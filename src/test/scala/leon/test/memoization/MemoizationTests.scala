@@ -187,6 +187,7 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
   val pipeFront = 
     frontends.scalac.ExtractionPhase andThen
     purescala.MethodLifting andThen
+    utils.ScopingPhase andThen
     utils.SubtypingPhase andThen
     purescala.CompleteAbstractDefinitions 
   val inputFilePath  = "regression/memoization/original"
@@ -297,9 +298,11 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
           AnalysisPhase andThen 
           ExcludeVerifiedPhase andThen 
           MemoizationPhase andThen
+          leon.purescala.RestoreMethods andThen
           utils.FileOutputPhase
         } else {
           MemoizationPhase andThen
+          leon.purescala.RestoreMethods andThen
           utils.FileOutputPhase
         }
         val res = (pipeFront andThen pipeline).run(ctx)(f.getAbsolutePath :: Nil)

@@ -15,20 +15,30 @@ object Definitions {
 
   sealed abstract class Definition extends Tree {
     val id: Identifier
-    val optEnclosing : Option[Definition]
+    var enclosing : Option[Definition] = None // The definition/scope enclosing this definition
+    def subDefinitions : Seq[Definition]      // The enclosed scopes/definitions by this definition
     override def hashCode : Int = id.hashCode
     override def equals(that : Any) : Boolean = that match {
       case t : Definition => t.id == this.id
       case _ => false
     }
+    override def copiedFrom(o : Tree) : this.type = {
+      super.copiedFrom(o)
+      o match {
+        case df : Definition => enclosing = df.enclosing
+        case _ => // FIXME should this ever happen?
+      }
+      this
+    }
   }
 
   /** A ValDef declares a new identifier to be of a certain type. */
-  case class ValDef(id: Identifier, tpe: TypeTree, optEnclosing : Option[Definition]) extends Definition with FixedType {
+  case class ValDef(id: Identifier, tpe: TypeTree) extends Definition with FixedType {
     self: Serializable =>
 
     val fixedType = tpe
 
+    def subDefinitions = Seq()
     override def hashCode : Int = id.hashCode
     override def equals(that : Any) : Boolean = that match {
       case t : ValDef => t.id == this.id
@@ -41,7 +51,9 @@ object Definitions {
   /** A wrapper for a program. For now a program is simply a single object. The
    * name is meaningless and we just use the package name as id. */
   case class Program(id: Identifier, modules: List[ModuleDef]) extends Definition {
-    override val optEnclosing = None
+    enclosing = None
+    
+    def subDefinitions = modules
     
     def definedFunctions    = modules.flatMap(_.definedFunctions)
     def definedClasses      = modules.flatMap(_.definedClasses)
@@ -80,14 +92,16 @@ object Definitions {
   }
 
   case class TypeParameterDef(tp: TypeParameter) extends Definition {
+    def subDefinitions = Seq()
     val optEnclosing = None
     val id = tp.id
   }
 
   /** Objects work as containers for class definitions, functions (def's) and
    * val's. */
-  case class ModuleDef(id: Identifier, defs : Seq[Definition], enclosing : Definition) extends Definition {
-    override val optEnclosing = Some(enclosing)
+  case class ModuleDef(id: Identifier, defs : Seq[Definition]) extends Definition {
+    
+    def subDefinitions = defs
     
     lazy val definedFunctions : Seq[FunDef] = defs.collect { case fd: FunDef => fd }
 
@@ -98,27 +112,28 @@ object Definitions {
     }
 
     lazy val algebraicDataTypes : Map[AbstractClassDef, Seq[CaseClassDef]] = (defs.collect {
-      case c @ CaseClassDef(_, _, Some(p), _, _) => c
+      case c @ CaseClassDef(_, _, Some(p),  _) => c
     }).groupBy(_.parent.get.classDef)
 
     lazy val singleCaseClasses : Seq[CaseClassDef] = defs.collect {
-      case c @ CaseClassDef(_, _, None, _, _) => c
+      case c @ CaseClassDef(_, _, None,  _) => c
     }
 
   }
 
   /** Useful because case classes and classes are somewhat unified in some
    * patterns (of pattern-matching, that is) */
-  abstract sealed class ClassDef(enclosing : Definition) extends Definition {
+  sealed trait ClassDef extends Definition {
     
     self =>
 
-    val optEnclosing = Some(enclosing)
     val id: Identifier
     val tparams: Seq[TypeParameterDef]
     def fields: Seq[ValDef]
     val parent: Option[AbstractClassType]
 
+    def subDefinitions = methods
+    
     def hierarchyRoot : ClassDef = 
       if (!hasParent) this else parent.get.classDef.hierarchyRoot 
 
@@ -163,10 +178,11 @@ object Definitions {
   }
 
   /** Abstract classes. */
-  case class AbstractClassDef(val id: Identifier,
-                              val tparams: Seq[TypeParameterDef],
-                              val parent: Option[AbstractClassType],
-                              val enclosing : Definition) extends ClassDef(enclosing) {
+  case class AbstractClassDef(
+      val id: Identifier,
+      val tparams: Seq[TypeParameterDef],
+      val parent: Option[AbstractClassType]
+  ) extends ClassDef {
 
     val fields = Nil
     val isAbstract   = true
@@ -178,9 +194,9 @@ object Definitions {
       val id: Identifier,
       val tparams: Seq[TypeParameterDef],
       val parent: Option[AbstractClassType],
-      val enclosing : Definition,
       private var _isCaseObject: Boolean
-  ) extends ClassDef(enclosing) {
+  ) extends ClassDef {
+
 
     def isCaseObject = _isCaseObject
     
@@ -213,38 +229,42 @@ object Definitions {
       val id: Identifier, 
       val tparams: Seq[TypeParameterDef], 
       val returnType: TypeTree, 
-      val params: Seq[ValDef],
-      val enclosing : Definition 
+      val params: Seq[ValDef]
   ) extends Definition {
     
-    val optEnclosing = Some(enclosing)
+    def subDefinitions = Seq()
+    
     var body: Option[Expr] = None
     def implementation : Option[Expr] = body
     var precondition: Option[Expr] = None
     var postcondition: Option[(Identifier, Expr)] = None
-
-    def isClassMethod = enclosing.isInstanceOf[ClassDef]
     
     // Metadata kept here after transformations
     var parent: Option[FunDef] = None
     var orig: Option[FunDef] = None
 
+    /*override def copiedFrom(o : Tree) : this.type = {
+      super.copiedFrom(o)
+      o match {
+        case fd : FunDef => this.copyContentFrom(fd)
+        case _ => 
+      }
+      this
+    }*/
+    
     def duplicate: FunDef = {
-      val fd = new FunDef(id, tparams, returnType, params, enclosing)
-      fd.body = body
-      fd.precondition = precondition
-      fd.postcondition = postcondition
-      fd.parent = parent
-      fd.orig = orig
+      val fd = FunDef(id, tparams, returnType, params)
+      fd.copyContentFrom(this)
       fd.copiedFrom(this)
     }
     
     def copyContentFrom(from : FunDef) {
-      body 			= from.body
-      precondition 	= from.precondition
-      postcondition = from.postcondition
-      parent 		= from.parent
-      orig 			= from.orig
+      this.body           = from.body
+      this.precondition   = from.precondition
+      this.postcondition  = from.postcondition
+      this.parent         = from.parent
+      this.orig           = from.orig
+      this.enclosing      = from.enclosing
     }
 
     def hasImplementation : Boolean = body.isDefined
@@ -271,7 +291,6 @@ object Definitions {
       TypedFunDef(this, Nil)
     }
 
-    def m2f(newEnclosing : Definition) = this.copy(enclosing = newEnclosing).copyContentFrom(this)
     
   }
 
@@ -301,11 +320,11 @@ object Definitions {
         (fd.params, Map())
       } else {
         val newParams = fd.params.map {
-          case vd @ ValDef(id, tpe, _) =>
+          case vd @ ValDef(id, tpe) =>
             val newTpe = translated(tpe)
             val newId = FreshIdentifier(id.name, true).setType(newTpe).copiedFrom(id)
 
-            ValDef(newId, newTpe, None).setPos(vd)
+            ValDef(newId, newTpe).setPos(vd)
         }
 
         val paramsMap: Map[Identifier, Identifier] = (fd.params zip newParams).map { case (vd1, vd2) => vd1.id -> vd2.id }.toMap

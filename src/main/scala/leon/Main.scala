@@ -10,6 +10,8 @@ object Main {
     List(
       frontends.scalac.ExtractionPhase,
       SubtypingPhase,
+      ScopingPhase,
+      FileOutputPhase,
       xlang.ArrayTransformation,
       xlang.EpsilonElimination,
       xlang.ImperativeCodeElimination,
@@ -199,9 +201,10 @@ object Main {
 
     val pipeBegin : Pipeline[List[String],Program] =
       frontends.scalac.ExtractionPhase andThen
+      utils.ScopingPhase andThen
       purescala.MethodLifting andThen
       utils.SubtypingPhase andThen
-      purescala.CompleteAbstractDefinitions
+      purescala.CompleteAbstractDefinitions 
 
     val pipeProcess: Pipeline[Program, Any] =
       if (settings.synthesis) {
@@ -215,9 +218,14 @@ object Main {
           verification.AnalysisPhase andThen 
           memoization.ExcludeVerifiedPhase andThen 
           memoization.MemoizationPhase andThen 
+          purescala.RestoreMethods andThen
           utils.FileOutputPhase
         }
-        else memoization.MemoizationPhase andThen utils.FileOutputPhase
+        else {
+          memoization.MemoizationPhase andThen 
+          purescala.RestoreMethods andThen
+          utils.FileOutputPhase
+        }
       } else if (settings.verify) {
         verification.AnalysisPhase
       } else {

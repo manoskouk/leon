@@ -57,17 +57,50 @@ class PrettyPrinter(opts: PrinterOptions, val sb: StringBuffer = new StringBuffe
     sb.append(post)
   }
 
+  // convert an operator witch has been turned into alphanumeric form back to symbolic
+  private def alphaNumToSymbolicId (s : String) = {
+    
+    val operatorTranscription = Map(
+        "bang"     -> "!",
+        "at"       -> "@",
+        "hash"     -> "#",
+        "percent"  -> "%",
+        "up"       -> "^",
+        "times"    -> "*",
+        "plus"     -> "+",
+        "minus"    -> "-",
+        "bslash"   -> "\\",
+        "bar"      -> "|",
+        "tilde"    -> "~",
+        "div"      -> "/",
+        "qmark"    -> "?",
+        "greater"  -> ">",
+        "less"     -> "<",
+        "colon"    -> ":"
+    )
+    
+    val pieces = s.split("\\$").toList   
+    val prelude = pieces.head // before first $, should remain unchanged
+    val operators = pieces.tail
+
+    prelude ++ (for (op <- operators) yield {  
+      operatorTranscription.get(op).getOrElse("$" + op) // this piece wasn't an operator after all
+    }).mkString("")
+    
+  } 
+  
   def pp(tree: Tree, parent: Option[Tree])(implicit lvl: Int): Unit = {
     implicit val p = Some(tree)
 
     tree match {
-      case id: Identifier =>
-        if (opts.printUniqueIds) {
-          sb.append(id.uniqueName)
+      case id: Identifier =>    
+        val name = if (opts.printUniqueIds) {
+          id.uniqueName
         } else {
-          sb.append(id.toString)
+          id.toString
         }
-
+        sb.append(alphaNumToSymbolicId(name))
+        
       case Variable(id) =>
         if (opts.printTypes) {
           sb.append("(")

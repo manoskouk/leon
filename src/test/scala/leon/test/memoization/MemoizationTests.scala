@@ -186,8 +186,8 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
 
   val pipeFront = 
     frontends.scalac.ExtractionPhase andThen
-    purescala.MethodLifting andThen
     utils.ScopingPhase andThen
+    purescala.MethodLifting andThen
     utils.SubtypingPhase andThen
     purescala.CompleteAbstractDefinitions 
   val inputFilePath  = "regression/memoization/original"
@@ -282,7 +282,7 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
     test ("Testing " + f.getName) {
       // Compile original file
       val timeOut = 2
-      val settings = testContext.settings.copy(memo = true, debugSections = Set(DebugSectionMemoization))
+      val settings = testContext.settings.copy(memo = true, debugSections = Set(DebugSectionMemoization), injectLibrary = true)
       val ctx = testContext.copy(
         // We want a reporter that actually prints some output
         reporter = new DefaultReporter(settings),
@@ -486,6 +486,12 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
       }
     }
 
+    if (MemoTestOptions.testPoly){
+      forEachFileIn(inputFilePath + "/incrementalPoly") { f => 
+        testMemo(f, MemoTestOptions.Incremental)
+      }
+    }
+    
     if (MemoTestOptions.testBulk){
       forEachFileIn(inputFilePath + "/bulk") { f => 
         testMemo(f, MemoTestOptions.Bulk)

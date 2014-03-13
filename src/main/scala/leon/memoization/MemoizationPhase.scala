@@ -130,13 +130,15 @@ object MemoizationPhase extends TransformationPhase {
       // Name of resulting function e.g. getClassNameFields
       val funName = FreshIdentifier(s"get${extraField.get.id.name}")  
       // Type parameters of resulting function
-      val freshTpParams = freshenClassDefTpParams()
+      //val freshTpParams = freshenClassDefTpParams()
+      //Use type parameters of classDef
+      val tpParams = classDef.tparams map {_.tp}
       // Return type of res. function. e.g. ClassNameFields
-      val retType = CaseClassType(extraField.get,freshTpParams) // FIXME OK
+      val retType = CaseClassType(extraField.get,tpParams) // FIXME OK
       // Name of parameter e.g. className
       //val paramName = idToFreshLowerCase(classDef.id)
       // This will become a method, so use a ThisIdentifier
-      val paramId = FreshThisId(classDefToClassType(classDef,freshTpParams)) // TODO
+      val paramId = FreshThisId(classDefToClassType(classDef,tpParams)) // TODO
       // Arguments of resulting function, e.g. ( className : ClassName )
       val args = Seq(new ValDef(paramId, classType)) 
 
@@ -144,7 +146,7 @@ object MemoizationPhase extends TransformationPhase {
       val body: Expr = classDef match { 
         case cc : CaseClassDef =>
           // Here the body is just retrieving the field
-          CaseClassSelector(new CaseClassType(cc, freshTpParams /*FIXME*/), Variable(paramId), cc.fields.find(_.id.name == funName.name).get.id)
+          CaseClassSelector(new CaseClassType(cc, tpParams /*FIXME*/), Variable(paramId), cc.fields.find(_.id.name == funName.name).get.id)
         case ab : AbstractClassDef => {
           
           // Construct the cases :
@@ -153,8 +155,8 @@ object MemoizationPhase extends TransformationPhase {
 
           val cases = for (cc <- caseClasses) yield {
             val id = idToFreshLowerCase(cc.id)
-            val patt = InstanceOfPattern( Some(id), new CaseClassType(cc, freshTpParams) )
-            val bd = new CaseClassSelector( new CaseClassType(cc,freshTpParams /*FIXME*/), Variable(id),
+            val patt = InstanceOfPattern( Some(id), new CaseClassType(cc, tpParams) )
+            val bd = new CaseClassSelector( new CaseClassType(cc,tpParams /*FIXME*/), Variable(id),
               cc.fields.find( _.id.name == nameToLowerCase(extraField.get.id.name)).get.id
             )
 
@@ -163,7 +165,7 @@ object MemoizationPhase extends TransformationPhase {
 
 
           // the variable to do case analysis on
-          val scrutinee = Variable(paramId).setType(AbstractClassType(ab, freshTpParams)) // FIXME
+          val scrutinee = Variable(paramId).setType(AbstractClassType(ab, tpParams)) // FIXME
 
           // The complete match expr.
           MatchExpr(scrutinee, cases)
@@ -171,7 +173,7 @@ object MemoizationPhase extends TransformationPhase {
       }
 
       // Now construct the whole definition and add body
-      val funDef = new FunDef(funName, freshTpParams map TypeParameterDef, retType, args) // FIXME type params
+      val funDef = new FunDef(funName, classDef.tparams, retType, args) // FIXME type params
       funDef.body = Some(body)
       funDef.enclosing = Some(classDef) 
       funDef
@@ -180,23 +182,24 @@ object MemoizationPhase extends TransformationPhase {
 
     // New versions of funsToMemoize, utilizing the memoized field
     lazy val memoizedFuns : Seq[FunDef] = for ( fn <- classDefRecursiveFuns) yield {
-      // Fresh type parameters for the memoized function
-      val freshTpParams = freshenClassDefTpParams()
+      // Use parent's type parameters, since this will become a method
+      val tparams = classDef.tparams
       // Identifier of the input function
+      assert(fn.params.length == 1)
       val oldArg = fn.params.head.id
       // the new argument will have the new type corresponding to this type
       val newArg = new ValDef(freshIdentifier(oldArg.name), classType )
       val newFun = new FunDef(
         id         = fn.id.freshen, 
-        tparams    = freshTpParams map TypeParameterDef, // FIXME TYPE PARAMS
-        returnType = instantiateType(fn.returnType, (classDef.tparams zip freshTpParams).toMap), // This is correct only with side-effects
+        tparams    = tparams, // FIXME TYPE PARAMS
+        returnType = fn.returnType, // This is correct only with side-effects
         params     = Seq(newArg)
       )
       // The object whose field we select is an application of fieldExtractor on newArg
       val argVar = Variable(newArg.id).setType(classType)
-      val bodyObject = new FunctionInvocation( fieldExtractor.get.typed(freshTpParams), Seq(argVar) ) // FIXME Type params
+      val bodyObject = new FunctionInvocation( fieldExtractor.get.typed(tparams map {_.tp}), Seq(argVar) ) // FIXME Type params
       newFun.body = Some(CaseClassSelector(
-        CaseClassType(extraField.get, freshTpParams), // FIXME
+        CaseClassType(extraField.get, tparams map {_.tp}), // FIXME
         bodyObject, 
         extraField.get.fields.find{ _.id.name == fn.id.name }.get.id
       ))

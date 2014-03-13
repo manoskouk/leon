@@ -188,7 +188,7 @@ trait CodeExtraction extends ASTExtractors {
             val extraModules: List[(String, List[Tree])] = if (standaloneDefs.isEmpty) {
               Nil
             } else {
-              List(("standalone", standaloneDefs.reverse))
+              List(("standalone$", standaloneDefs.reverse))
             }
 
             modules ++ extraModules

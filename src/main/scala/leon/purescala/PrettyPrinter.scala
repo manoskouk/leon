@@ -66,6 +66,7 @@ class PrettyPrinter(opts: PrinterOptions, val sb: StringBuffer = new StringBuffe
         "hash"     -> "#",
         "percent"  -> "%",
         "up"       -> "^",
+        "amp"      -> "&",
         "times"    -> "*",
         "plus"     -> "+",
         "minus"    -> "-",

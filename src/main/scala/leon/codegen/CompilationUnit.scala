@@ -164,10 +164,9 @@ class CompilationUnit(val ctx: LeonContext,
     case tpl: runtime.Tuple =>
       val elems = for (i <- 0 until tpl.getArity) yield {
         jvmToExpr(tpl.get(i))
-
       }
       Tuple(elems)
-    
+
     case gv : GenericValue =>
       gv
 
@@ -181,8 +180,10 @@ class CompilationUnit(val ctx: LeonContext,
         (k, v)
       }
       FiniteMap(pairs.toSeq)
-  }
 
+    case _ =>
+      throw CompilationException("Unsupported return value : " + e.getClass)
+  }
 
   def compileExpression(e: Expr, args: Seq[Identifier]): CompiledExpression = {
     if(e.getType == Untyped) {

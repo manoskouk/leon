@@ -93,7 +93,6 @@ object Definitions {
 
   case class TypeParameterDef(tp: TypeParameter) extends Definition {
     def subDefinitions = Seq()
-    val optEnclosing = None
     val id = tp.id
   }
 
@@ -112,11 +111,11 @@ object Definitions {
     }
 
     lazy val algebraicDataTypes : Map[AbstractClassDef, Seq[CaseClassDef]] = (defs.collect {
-      case c @ CaseClassDef(_, _, Some(p),  _) => c
+      case c @ CaseClassDef(_, _, Some(p), _) => c
     }).groupBy(_.parent.get.classDef)
 
     lazy val singleCaseClasses : Seq[CaseClassDef] = defs.collect {
-      case c @ CaseClassDef(_, _, None,  _) => c
+      case c @ CaseClassDef(_, _, None, _) => c
     }
 
   }

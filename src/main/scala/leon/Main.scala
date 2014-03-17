@@ -204,7 +204,7 @@ object Main {
       utils.ScopingPhase andThen
       purescala.MethodLifting andThen
       utils.SubtypingPhase andThen
-      purescala.CompleteAbstractDefinitions 
+      purescala.CompleteAbstractDefinitions
 
     val pipeProcess: Pipeline[Program, Any] =
       if (settings.synthesis) {

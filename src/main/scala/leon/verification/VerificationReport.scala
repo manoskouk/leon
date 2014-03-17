@@ -28,7 +28,7 @@ class VerificationReport(val program : Program, val fvcs: Map[FunDef, List[Verif
     conditions.map(VerificationReport.infoLine).mkString("\n", "\n", "\n") +
     VerificationReport.infoSep +
     ("║ total: %-4d   valid: %-4d   invalid: %-4d   unknown %-4d " +
-      (" " * 21) +
+      (" " * 23) +
       " %7.3f ║\n").format(totalConditions, totalValid, totalInvalid, totalUnknown, totalTime) +
     VerificationReport.infoFooter
   } else {
@@ -47,16 +47,17 @@ object VerificationReport {
     }
   }
 
-  private val infoSep    : String = "╟" + ("┄" * 88) + "╢\n"
-  private val infoFooter : String = "╚" + ("═" * 88) + "╝"
-  private val infoHeader : String = ". ┌─────────┐\n" +
-                                    "╔═╡ Summary ╞" + ("═" * 76) + "╗\n" +
-                                    "║ └─────────┘" + (" " * 76) + "║"
+  private val infoSep    : String = "╟" + ("┄" * 90) + "╢\n"
+  private val infoFooter : String = "╚" + ("═" * 90) + "╝"
+  private val infoHeader : String = 
+    ". ┌─────────┐\n" +
+    "╔═╡ Summary ╞" + ("═" * 78) + "╗\n" +
+    "║ └─────────┘" + (" " * 78) + "║"
 
   private def infoLine(vc : VerificationCondition) : String = {
     val timeStr = vc.time.map(t => "%-3.3f".format(t)).getOrElse("")
 
-    "║ %-25s %-9s %14s %-8s %-10s %-7s %7s ║".format(
+    "║ %-25s %-9s %16s %-8s %-10s %-7s %7s ║".format(
       fit(vc.funDef.id.toString, 25),
       vc.kind,
       vc.getPos,

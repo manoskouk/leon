@@ -282,7 +282,11 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
     test ("Testing " + f.getName) {
       // Compile original file
       val timeOut = 2
-      val settings = testContext.settings.copy(memo = true, debugSections = Set(DebugSectionMemoization), injectLibrary = true)
+      val settings = testContext.settings.copy(
+        memo = true, 
+        debugSections = Set(DebugSectionMemoization), 
+        injectLibrary = MemoTestOptions.library
+      )
       val ctx = testContext.copy(
         // We want a reporter that actually prints some output
         reporter = new DefaultReporter(settings),

@@ -76,7 +76,7 @@ object LeftistHeap {
 
  
   def removeMax(h: Tree[Int]) : Tree[Int] = {
-    require(!h.isEmpty && hasLeftistProperty(h))
+    require(!h.isEmpty && hasLeftistProperty(h) && hasHeapProperty(h))
     h match {
       case Node(l,v,r) =>  merge(l, r)
     } 
@@ -95,13 +95,24 @@ object LeftistHeap {
       case (Leaf(), _) => h2
       case (_, Leaf()) => h1
       case (Node(l1, v1, r1), Node(l2, v2, r2)) => 
-        if(v1 <= v2)
-          Node(l1, v1, merge(r1, h2))
-        else
-          Node(l2, v2, merge(h1, r2))
+        if(v1 <= v2) {
+          val merged = merge(r1, h2)
+          if (l1.height <= merged.height)
+            Node(l1, v1, merged)
+          else 
+            Node(merged, v1, l1)
+        }
+        else {
+          val merged = merge(r2,h1)
+          if (l2.height <= l1.height)
+            Node(l2, v2, merged)
+          else 
+            Node(merged, v2, l2)
+        }
     }
   } ensuring( res => 
     res.size == h1.size + h2.size &&
+    res.height <= h1.height + h2.height &&
     hasLeftistProperty(res) &&
     hasHeapProperty(res)
   )
@@ -116,7 +127,8 @@ object LeftistHeap {
   }
 
   def init() : Tree[Int] = Leaf()
-  def test(h : Tree[Int], i : Int ) : Tree[Int] = insert(i,h)
+  @ignore
+  def test(h : Tree[Int], i : Int ) : Tree[Int] =                                                                                                                    insert(i,h)
 
 
 }

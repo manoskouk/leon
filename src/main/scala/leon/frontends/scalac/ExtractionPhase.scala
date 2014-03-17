@@ -12,7 +12,7 @@ import scala.tools.nsc.{Settings=>NSCSettings,CompilerCommand}
 
 object ExtractionPhase extends LeonPhase[List[String], Program] {
 
-  val name = "Scalc Extraction"
+  val name = "Scalac Extraction"
   val description = "Extraction of trees from the Scala Compiler"
 
   implicit val debug = DebugSectionTrees

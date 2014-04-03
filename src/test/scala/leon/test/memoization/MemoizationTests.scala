@@ -24,7 +24,7 @@ import java.io.{BufferedWriter, FileWriter, File}
 
 
 
-class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources/", "target/scala-2.10/test-classes/resources/") {
+class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources/", "target/scala-2.10/test-classes/") {
 
  
   // Define expressions which define CaseClass expression equality correctly
@@ -190,11 +190,11 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
     purescala.MethodLifting andThen
     utils.SubtypingPhase andThen
     purescala.CompleteAbstractDefinitions 
-  val inputFilePath  = "regression/memoization/original"
-  val outputFilePath = "regression/memoization/memoOut"
+  val inputFilePath  = "regression/memoization"
+  val outputFilePath = "regression/memoization"
 
   val testSizesAndRepetitions = Seq( 
-    (20,12)
+    (20,2)
   )
 
   
@@ -296,17 +296,17 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
 
       ctx.reporter.info("Now testing " + f.getAbsolutePath)
       
-      val transAST = if (applyTransform) { 
+      val transASTWrong = if (applyTransform) { 
         ctx.reporter.info("Applying transformation")
         val pipeline = if (testWithVerify) {
           AnalysisPhase andThen 
           ExcludeVerifiedPhase andThen 
           MemoizationPhase andThen
-          leon.purescala.RestoreMethods andThen
+         // leon.purescala.RestoreMethods andThen
           utils.FileOutputPhase
         } else {
           MemoizationPhase andThen
-          leon.purescala.RestoreMethods andThen
+        //  leon.purescala.RestoreMethods andThen
           utils.FileOutputPhase
         }
         val res = (pipeFront andThen pipeline).run(ctx)(f.getAbsolutePath :: Nil)
@@ -332,6 +332,14 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
         pipeFront.run(ctx3)(new File(outFileName).getAbsolutePath :: Nil) 
       }
        
+      // Recompile from source to get around bugs...
+      val transAST = if (applyTransform) {
+        val ctx3 = ctx.copy(reporter = new DefaultReporter(settings))
+        ctx3.reporter.info("Trying to compile transformed file from source...")
+        pipeFront.run(ctx3)(new File(outFileName).getAbsolutePath :: Nil) 
+      } else transASTWrong
+      
+      
       // Compile to bytecode, check output equality and performance
       
       if (testOutputs) {

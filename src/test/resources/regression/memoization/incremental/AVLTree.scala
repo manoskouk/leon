@@ -7,7 +7,6 @@
 import leon._
 import leon.lang._
 import leon.annotation._ 
-import leon.collection._
 
 object AVLTree  {
   sealed abstract class Tree

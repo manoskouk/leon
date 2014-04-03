@@ -218,7 +218,7 @@ object Main {
           verification.AnalysisPhase andThen 
           memoization.ExcludeVerifiedPhase andThen 
           memoization.MemoizationPhase andThen 
-          purescala.RestoreMethods andThen
+          //purescala.RestoreMethods andThen
           utils.FileOutputPhase
         }
         else {

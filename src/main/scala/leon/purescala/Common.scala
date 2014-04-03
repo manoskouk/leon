@@ -85,7 +85,7 @@ object Common {
   }
   
   class ThisIdentifier private[Common] (val cType : ClassType, private val globalId: Int, override val id : Int, alwaysShowUniqueID: Boolean = false) 
-    extends Identifier ("this$", globalId, id, alwaysShowUniqueID) with FixedType {
+    extends Identifier ("$this", globalId, id, alwaysShowUniqueID) with FixedType {
 
     override val fixedType = cType
 

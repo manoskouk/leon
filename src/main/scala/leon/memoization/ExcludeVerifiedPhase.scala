@@ -219,7 +219,7 @@ object ExcludeVerifiedPhase extends LeonPhase[VerificationReport, Program] {
     ctx.reporter.info("Removing proven formal contracts...")
 
     val toRet = excludeVerified(vRep)
-    dbg(purescala.ScalaPrinter(toRet))
+    //dbg(purescala.ScalaPrinter(toRet))
     toRet
   }
 

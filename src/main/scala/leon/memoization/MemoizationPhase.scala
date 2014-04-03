@@ -35,7 +35,10 @@ object MemoizationPhase extends TransformationPhase {
   private val alwaysShowUniqueId = false 
   private def freshIdentifier (name : String) = FreshIdentifier(name, alwaysShowUniqueId)
 
-  
+  def acceptableParams(f : FunDef) = {
+      f.params.size == 1 ||
+      f.params.size == 2 && f.params.tail.head.id.name == "__isVerified"
+    }
   
   /**
    * A tree structure, homomorphic to the structure of a class tree in the program,
@@ -135,8 +138,6 @@ object MemoizationPhase extends TransformationPhase {
       val tpParams = classDef.tparams map {_.tp}
       // Return type of res. function. e.g. ClassNameFields
       val retType = CaseClassType(extraField.get,tpParams) // FIXME OK
-      // Name of parameter e.g. className
-      //val paramName = idToFreshLowerCase(classDef.id)
       // This will become a method, so use a ThisIdentifier
       val paramId = FreshThisId(classDefToClassType(classDef,tpParams)) // TODO
       // Arguments of resulting function, e.g. ( className : ClassName )
@@ -185,25 +186,31 @@ object MemoizationPhase extends TransformationPhase {
       // Use parent's type parameters, since this will become a method
       val tparams = classDef.tparams
       // Identifier of the input function
-      assert(fn.params.length == 1)
+      assert( acceptableParams(fn) )
       val oldArg = fn.params.head.id
       // the new argument will have the new type corresponding to this type
       val newArg = new ValDef(freshIdentifier(oldArg.name), classType )
+      val newArgs = if (fn.hasPrecondition) Seq(newArg, fn.params(1))
+                    else Seq(newArg)
       val newFun = new FunDef(
         id         = fn.id.freshen, 
         tparams    = tparams, // FIXME TYPE PARAMS
         returnType = fn.returnType, // This is correct only with side-effects
-        params     = Seq(newArg)
+        params     = newArgs
       )
       // The object whose field we select is an application of fieldExtractor on newArg
       val argVar = Variable(newArg.id).setType(classType)
       val bodyObject = new FunctionInvocation( fieldExtractor.get.typed(tparams map {_.tp}), Seq(argVar) ) // FIXME Type params
+      
+
+      newFun.copyContentFrom(fn)
+      
       newFun.body = Some(CaseClassSelector(
         CaseClassType(extraField.get, tparams map {_.tp}), // FIXME
         bodyObject, 
         extraField.get.fields.find{ _.id.name == fn.id.name }.get.id
       ))
-
+      
       newFun.copiedFrom(fn)
     }
 
@@ -759,9 +766,12 @@ object MemoizationPhase extends TransformationPhase {
       (p.definedFunctions filter { _.annotations.contains("forceMemo") } ).toSet
     dbg("I found these candidates:\n" + allCandidates.map {_.id.name}.mkString("\n"))
     
+    
+    
+    
     // Filter these to have the desired form
     val recMemo = allCandidates filter { f =>  
-      f.params.size == 1 &&
+      acceptableParams(f) &&
       f.params.head.getType.isInstanceOf[ClassType] &&
       p.callGraph.transitivelyCalls(f,f) &&
       ( 

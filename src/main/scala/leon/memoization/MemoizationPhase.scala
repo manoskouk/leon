@@ -190,7 +190,7 @@ object MemoizationPhase extends TransformationPhase {
       val oldArg = fn.params.head.id
       // the new argument will have the new type corresponding to this type
       val newArg = new ValDef(freshIdentifier(oldArg.name), classType )
-      val newArgs = if (fn.hasPrecondition) Seq(newArg, fn.params(1))
+      val newArgs = if (fn.params.length > 1) Seq(newArg, fn.params(1))
                     else Seq(newArg)
       val newFun = new FunDef(
         id         = fn.id.freshen, 

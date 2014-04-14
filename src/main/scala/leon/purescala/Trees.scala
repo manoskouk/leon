@@ -489,6 +489,7 @@ object Trees {
   /* Set expressions */
   case class FiniteSet(elements: Seq[Expr]) extends Expr {
     val tpe = if (elements.isEmpty) None else leastUpperBound(elements.map(_.getType))
+    val e = Thread.currentThread().getStackTrace().map{_.toString()}.mkString("\n")
     tpe.foreach(t => setType(SetType(t)))
   }
   // TODO : Figure out what evaluation order is, for this.

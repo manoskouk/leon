@@ -41,5 +41,7 @@ parallelExecution in Test := false
 
 javaOptions in (Test, run) += "-Xss128m"
 
+javaOptions in (Test, run) += "-Xsx8G"
+
 sourcesInBase in Compile := false
 

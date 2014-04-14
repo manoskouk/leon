@@ -194,7 +194,12 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
   val outputFilePath = "regression/memoization"
 
   val testSizesAndRepetitions = Seq( 
-    (20,2)
+    (100,40),
+    (250, 25),
+    (500, 30),
+    (1000, 10),
+    (1500, 6),
+    (2000, 3)
   )
 
   
@@ -325,6 +330,9 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
       val ctx2 = ctx.copy(reporter = new DefaultReporter(settings))
       val origAST = pipeFront.run(ctx2)(f.getAbsolutePath :: Nil) 
       
+      ctx.reporter.info("Recompiling original, and removing proven FCs" + f.getName)
+      val origASTRemoved = ( pipeFront andThen AnalysisPhase andThen ExcludeVerifiedPhase).run(ctx2.copy())(f.getAbsolutePath()::Nil)
+      
       // Test if output compiles
       if (testOutputValidity) { 
         val ctx3 = ctx.copy(reporter = new DefaultReporter(settings))
@@ -333,12 +341,17 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
       }
        
       // Recompile from source to get around bugs...
-      val transAST = if (applyTransform) {
+      val transASTRemoved = if (applyTransform) {
         val ctx3 = ctx.copy(reporter = new DefaultReporter(settings))
         ctx3.reporter.info("Trying to compile transformed file from source...")
         pipeFront.run(ctx3)(new File(outFileName).getAbsolutePath :: Nil) 
       } else transASTWrong
       
+      val transAST = {
+        val ctx4 = ctx.copy(reporter = new DefaultReporter(settings), options = testContext.options :+ LeonValueOption("o", outFileName + ".2"))
+        (pipeFront andThen MemoizationPhase andThen purescala.RestoreMethods andThen utils.FileOutputPhase).run(ctx4)(f.getAbsolutePath() :: Nil)
+        pipeFront.run(ctx4)( new File(outFileName + ".2").getAbsolutePath() :: Nil)
+      }
       
       // Compile to bytecode, check output equality and performance
       
@@ -348,23 +361,33 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
 
         ctx.reporter.info("Compiling original to bytecode")
         val (init1, compiled1) = compileTestFun(origAST,ctx)
+        ctx.reporter.info("Compiling original, FCs removed to bytecode")
+        val (init2, compiled2) = compileTestFun(origASTRemoved,ctx)
         ctx.reporter.info("Compiling transformed to bytecode")
-        val (init2, compiled2) = compileTestFun(transAST,ctx)
-        
+        val (init3, compiled3) = compileTestFun(transAST,ctx)
+        ctx.reporter.info("Compiling transformed, FCs removed to bytecode")
+        val (init4, compiled4) = compileTestFun(transASTRemoved,ctx)
 
         if (testOriginalOut) {
-          ctx.reporter.info(" Size,        Original,     Transformed")
+          ctx.reporter.info(" Size,        Original,     OriginalRem., Transformed,   TransformedRem.")
           for ((size, timesForSize) <- testSizesAndRepetitions) {
             for (i <- 1 to timesForSize) {  
               System.gc() // hopefully won't have gc in the middle of things... 
-              //ctx.reporter.info("Start")
+              //ctx.reporter.info("timing 1")
               val (res1, time1) = time{compiled1(init1,size)}
-              //ctx.reporter.info("End")
               System.gc()
-              //ctx.reporter.info("Start")
+              //ctx.reporter.info("timimg 2")
+              System.gc()
               val (res2, time2) = time{compiled2(init2,size)} 
+              //ctx.reporter.info("timimg 3")    
+              System.gc()
+              val (res3, time3) = time{compiled3(init3,size)} 
+              System.gc()
+              //ctx.reporter.info("timimg 4")    
+              val (res4, time4) = time{compiled4(init4,size)} 
+
               //ctx.reporter.info("End")
-              val outAreEq = (res1, res2) match {
+              val outAreEq = (res1, res3) match {
                 case (Successful(ex1), Successful(ex2)) if (looseEq(ex1,ex2)) => {
                   true
                 } 
@@ -373,7 +396,7 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
               }
 
               outAreEq match { 
-                case true  => ctx.reporter.info("%5d, %15.1f, %15.1f" format (size, time1, time2) )
+                case true  => ctx.reporter.info("%5d, %15.1f, %15.1f, %15.1f, %15.1f" format (size, time1, time2, time3, time4) )
                 case false => ctx.reporter.info("%5d, %15.1f, %15.1f ERROR" format (size, time1, time2) )
               }
               /*
@@ -398,7 +421,7 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
             }
           }
         } else {
-          ctx.reporter.info(" Size, Original,     Transformed")
+          ctx.reporter.info(" Size,  OriginalRem., Transformed,   TransformedRem.")
           for ((size, timesForSize) <- testSizesAndRepetitions) {
             for (i <- 1 to timesForSize) {  
               System.gc() // hopefully won't have gc in the middle of things... 
@@ -406,8 +429,12 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
               // HACK: To quickly measure only the original use this:
               //val (res2, time2) = time{compiled1(init1,size)} 
               val (res2, time2) = time{compiled2(init2,size)} 
+              System.gc() // hopefully won't have gc in the middle of things... 
+              val (res3, time3) = time{compiled3(init3,size)} 
+              System.gc() // hopefully won't have gc in the middle of things... 
+              val (res4, time4) = time{compiled4(init4,size)} 
               //ctx.reporter.info("End")
-              ctx.reporter.info("%5d,    DUMMY, %15.1f" format (size, time2) )
+              ctx.reporter.info("%5d,  %15.1f,  %15.1f,  %15.1f" format (size, time2, time3, time4) )
             }
           }
         }

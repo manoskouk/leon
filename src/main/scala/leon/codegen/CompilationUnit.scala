@@ -156,7 +156,9 @@ class CompilationUnit(val ctx: LeonContext,
 
       jvmClassToLeonClass(e.getClass.getName) match {
         case Some(cc: CaseClassDef) =>
-          CaseClass(CaseClassType(cc, Nil), fields.map(jvmToExpr))
+          val theFields = fields.map(jvmToExpr).toList
+          theFields zip cc.fields map { case (realField, formalField) => realField.setType(formalField.tpe) }
+          CaseClass(CaseClassType(cc, Nil), theFields)
         case _ =>
           throw CompilationException("Unsupported return value : " + e)
       }
@@ -165,15 +167,18 @@ class CompilationUnit(val ctx: LeonContext,
       val elems = for (i <- 0 until tpl.getArity) yield {
         jvmToExpr(tpl.get(i))
       }
+      // FIXME set type to elems 
       Tuple(elems)
 
     case gv : GenericValue =>
       gv
 
     case set : runtime.Set =>
+      // FIXME set type to elems 
       FiniteSet(set.getElements().asScala.map(jvmToExpr).toSeq)
 
     case map : runtime.Map =>
+      // FIXME set type to elems 
       val pairs = map.getElements().asScala.map { entry =>
         val k = jvmToExpr(entry.getKey())
         val v = jvmToExpr(entry.getValue())
@@ -187,7 +192,7 @@ class CompilationUnit(val ctx: LeonContext,
 
   def compileExpression(e: Expr, args: Seq[Identifier]): CompiledExpression = {
     if(e.getType == Untyped) {
-      throw new IllegalArgumentException("Cannot compile untyped expression [%s].".format(e))
+      throw new IllegalArgumentException("Cannot compile untyped expression [%s].".format(e) + (if (e.isInstanceOf[FiniteSet]) e.asInstanceOf[FiniteSet].e else ""))
     }
 
     val id = CompilationUnit.nextExprId

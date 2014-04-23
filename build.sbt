@@ -43,5 +43,3 @@ javaOptions in (Test, run) += "-Xss128m"
 
 sourcesInBase in Compile := false
 
-// do not skip parent Eclipse project definition
-EclipseKeys.skipParents in ThisBuild := false

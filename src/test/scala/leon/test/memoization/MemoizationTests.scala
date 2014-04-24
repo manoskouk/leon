@@ -195,11 +195,11 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
 
   val testSizesAndRepetitions = Seq( 
     (100,40),
-    (250, 25),
-    (500, 30),
-    (1000, 10),
-    (1500, 6),
-    (2000, 3)
+    (250, 30),
+    (500, 20)%,
+    %(1000, 20),
+    %(1500, 20),
+    %(2000, 15)
   )
 
   
@@ -421,7 +421,7 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
             }
           }
         } else {
-          ctx.reporter.info(" Size,  OriginalRem., Transformed,   TransformedRem.")
+          ctx.reporter.info(" Size,  OriginalRem.,    TransformedRem.")
           for ((size, timesForSize) <- testSizesAndRepetitions) {
             for (i <- 1 to timesForSize) {  
               System.gc() // hopefully won't have gc in the middle of things... 
@@ -429,12 +429,12 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
               // HACK: To quickly measure only the original use this:
               //val (res2, time2) = time{compiled1(init1,size)} 
               val (res2, time2) = time{compiled2(init2,size)} 
-              System.gc() // hopefully won't have gc in the middle of things... 
-              val (res3, time3) = time{compiled3(init3,size)} 
+              //System.gc() // hopefully won't have gc in the middle of things... 
+              //val (res3, time3) = time{compiled3(init3,size)} 
               System.gc() // hopefully won't have gc in the middle of things... 
               val (res4, time4) = time{compiled4(init4,size)} 
               //ctx.reporter.info("End")
-              ctx.reporter.info("%5d,  %15.1f,  %15.1f,  %15.1f" format (size, time2, time3, time4) )
+              ctx.reporter.info("%5d,  %15.1f,   %15.1f" format (size, time2, time4) )
             }
           }
         }

@@ -91,10 +91,13 @@ object AmortizedQueue {
     case Queue(front, rear) => size(front) >= size(rear)
   }
 
-  def reverse(l : List) : List = (l match {
-    case Nil() => Nil()
-    case Cons(x, xs) => concat(reverse(xs), Cons(x, Nil()))
-  }) ensuring (res => content(res) == content(l))
+  def rev1(l : List, acc: List) : List = { l match {
+    case Nil() => acc
+    case Cons(x,xs) => rev1(xs, Cons(x,acc))
+  }} ensuring { res => size(res) == size(l) + size(acc) && content(res) == content(l) ++ content(acc) }
+
+  def reverse(l : List) : List = { rev1(l, Nil()) 
+  } ensuring (res => content(res) == content(l) && size(res) == size(l))
 
   def revConcatNth(l1:List, l2:List, i:Int) : Boolean = {
     require(0 <= i && i < size(l1)+size(l2))

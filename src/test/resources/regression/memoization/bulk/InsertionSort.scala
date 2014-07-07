@@ -16,7 +16,7 @@ object InsertionSort {
   }) ensuring(_ >= 0)
 
   def contents(l: List): Set[Int] = l match {
-    case Nil() => Set.empty
+    case Nil() => Set.empty[Int]
     case Cons(x,xs) => contents(xs) ++ Set(x)
   }
 

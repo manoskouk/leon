@@ -192,7 +192,10 @@ class CompilationUnit(val ctx: LeonContext,
 
   def compileExpression(e: Expr, args: Seq[Identifier]): CompiledExpression = {
     if(e.getType == Untyped) {
-      throw new IllegalArgumentException("Cannot compile untyped expression [%s].".format(e) + (if (e.isInstanceOf[FiniteSet]) e.asInstanceOf[FiniteSet].e else ""))
+      throw new IllegalArgumentException(
+          "Cannot compile untyped expression [%s].".format(e) + 
+          (if (e.isInstanceOf[FiniteSet]) e.asInstanceOf[FiniteSet].e else "")
+      )
     }
 
     val id = CompilationUnit.nextExprId

@@ -173,7 +173,7 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
     val before = System.nanoTime
     val res    = block
     val after  = System.nanoTime 
-    (block, ((after - before) *10 /1000000).toDouble * 0.1)
+    (res, ((after - before) *10 /1000000).toDouble * 0.1)
   }
 
   private def forEachFileIn(path : String)(block : File => Unit) {
@@ -193,17 +193,6 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
   val inputFilePath  = "regression/memoization"
   val outputFilePath = "regression/memoization"
 
-  val testSizesAndRepetitions = Seq( 
-    (100,40),
-    (250, 30),
-    (500, 20)%,
-    %(1000, 20),
-    %(1500, 20),
-    %(2000, 15)
-  )
-
-  
-  
   
   private def testMemo(f : File, how : MemoTestOptions.HowToTest) { 
     import MemoTestOptions._
@@ -368,77 +357,37 @@ class MemoizationTest extends leon.test.LeonEclipseTestSuite("src/test/resources
         ctx.reporter.info("Compiling transformed, FCs removed to bytecode")
         val (init4, compiled4) = compileTestFun(transASTRemoved,ctx)
 
-        if (testOriginalOut) {
-          ctx.reporter.info(" Size,        Original,     OriginalRem., Transformed,   TransformedRem.")
-          for ((size, timesForSize) <- testSizesAndRepetitions) {
-            for (i <- 1 to timesForSize) {  
-              System.gc() // hopefully won't have gc in the middle of things... 
-              //ctx.reporter.info("timing 1")
-              val (res1, time1) = time{compiled1(init1,size)}
-              System.gc()
-              //ctx.reporter.info("timimg 2")
-              System.gc()
-              val (res2, time2) = time{compiled2(init2,size)} 
-              //ctx.reporter.info("timimg 3")    
-              System.gc()
-              val (res3, time3) = time{compiled3(init3,size)} 
-              System.gc()
-              //ctx.reporter.info("timimg 4")    
-              val (res4, time4) = time{compiled4(init4,size)} 
+        val whatToRun = List(
+          (testOriginal,  compiled1, init1, "        Original"),
+          (testOriginalR, compiled2, init2, "    OriginalRem."),
+          (testTrans,     compiled3, init3, "     Transformed"),
+          (testTransR,    compiled4, init4, " TransformedRem.")
+        )
 
-              //ctx.reporter.info("End")
-              val outAreEq = (res1, res3) match {
-                case (Successful(ex1), Successful(ex2)) if (looseEq(ex1,ex2)) => {
-                  true
-                } 
-                case (RuntimeError(mess1), RuntimeError(mess2)) => true
-                case (_, _) => false
+
+        ctx.reporter.info("  Size" + (for ((true, _, _, str) <- whatToRun) yield(str)).mkString(""))
+
+        for ((size, timesForSize) <- testSizesAndRepetitions) {
+          for (i <- 1 to timesForSize) {  
+            val resTimes = 
+              for ( (true, compiled, init, str) <- whatToRun) yield {
+                System.gc() // hopefully won't have gc in the middle of things... 
+                time{compiled(init,size)}
               }
+            //val outAreEq = {
+            //  val results : List[Result] = resTimes map { _._1 } 
+            //  ( results forall { res : Result => res.isInstanceOf[RuntimeError] } ) ||
+             // ( results forall { res : Result => res.isInstanceOf[Successful]} ) && results.toSet.size == 1
+            //}
+           
+            var resp = ( "%5d" format size ) +
+              ( resTimes map { "%14.1f" format _._2 } mkString("") ) //+
+              //( if (outAreEq) "" else "  ERROR")
 
-              outAreEq match { 
-                case true  => ctx.reporter.info("%5d, %15.1f, %15.1f, %15.1f, %15.1f" format (size, time1, time2, time3, time4) )
-                case false => ctx.reporter.info("%5d, %15.1f, %15.1f ERROR" format (size, time1, time2) )
-              }
-              /*
-              (res1, res2) match {
-                case (Successful(ex1), Successful(ex2)) if (looseEq(ex1,ex2)) => {
-                  ctx.reporter.info("  Both programs produced the same output!")
-                  ctx.reporter.info("  Time for original    : " + ("%.1f" format time1) + " millisec.")
-                  ctx.reporter.info("  Time for transformed : " + ("%.1f" format time2) + " millisec.")
-                } 
-                case (RuntimeError(mess1), RuntimeError(mess2)) => 
-                  ctx.reporter.info("  Both programs produced an error") 
-                case (EvaluatorError(mess1), _ ) => 
-                  ctx.reporter.fatalError ("  Evaluation failed with message: " + mess1)
-                case (_, EvaluatorError(mess2) ) => 
-                  ctx.reporter.fatalError ("  Evaluation failed with message: " + mess2)
-                case _ => 
-                  ctx.reporter.error("Error")
-                  ctx.reporter.error("  Result1 = \n" + res1.toString)
-                  ctx.reporter.error("  Result2 = \n" + res2.toString)
-                  ctx.reporter.fatalError("  Outputs don't match for input size " + size) 
-              }*/
-            }
-          }
-        } else {
-          ctx.reporter.info(" Size,  OriginalRem.,    TransformedRem.")
-          for ((size, timesForSize) <- testSizesAndRepetitions) {
-            for (i <- 1 to timesForSize) {  
-              System.gc() // hopefully won't have gc in the middle of things... 
-              //ctx.reporter.info("Start")
-              // HACK: To quickly measure only the original use this:
-              //val (res2, time2) = time{compiled1(init1,size)} 
-              val (res2, time2) = time{compiled2(init2,size)} 
-              //System.gc() // hopefully won't have gc in the middle of things... 
-              //val (res3, time3) = time{compiled3(init3,size)} 
-              System.gc() // hopefully won't have gc in the middle of things... 
-              val (res4, time4) = time{compiled4(init4,size)} 
-              //ctx.reporter.info("End")
-              ctx.reporter.info("%5d,  %15.1f,   %15.1f" format (size, time2, time4) )
-            }
-          }
-        }
+            ctx.reporter.info(resp)
 
+          }
+        } 
       }
 
     }

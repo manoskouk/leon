@@ -23,5 +23,7 @@ package object annotation {
   @ignore
   class ignore     extends StaticAnnotation
 
+  @ignore
+  class forceMemo  extends StaticAnnotation
 }
 

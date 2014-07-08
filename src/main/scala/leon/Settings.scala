@@ -12,6 +12,7 @@ case class Settings(
   val repair: Boolean                  = false,
   val synthesis: Boolean               = false,
   val xlang: Boolean                   = false,
+  val memo: Boolean                    = false,
   val verify: Boolean                  = true,
   val selectedSolvers: Set[String]     = Set("fairz3")
 )

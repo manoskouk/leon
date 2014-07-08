@@ -22,6 +22,8 @@ object Main {
       synthesis.SynthesisPhase,
       termination.TerminationPhase,
       verification.AnalysisPhase,
+      memoization.RemoveVerifiedPhase,
+      memoization.MemoizationPhase,
       repair.RepairPhase
     )
   }
@@ -39,13 +41,14 @@ object Main {
       LeonValueOptionDef("solvers",     "--solvers=s1,s2",      "Use solvers s1 and s2 (fairz3,enum,smt)"),
       LeonValueOptionDef("debug",       "--debug=<sections..>", "Enables specific messages"),
       LeonFlagOptionDef ("noop",        "--noop",               "No operation performed, just output program"),
+      LeonFlagOptionDef ("memo",        "--memo",               "Memoization transformation"),
       LeonFlagOptionDef ("help",        "--help",               "Show help")
     )
 
   lazy val allOptions = allComponents.flatMap(_.definedOptions) ++ topLevelOptions
 
   def displayHelp(reporter: Reporter) {
-    reporter.info("usage: leon [--xlang] [--termination] [--synthesis] [--help] [--debug=<N>] [..] <files>")
+    reporter.info("usage: leon [--xlang] [--termination] [--synthesis] [--memo] [--noop] [--help] [--debug=<N>] [..] <files>")
     reporter.info("")
     for (opt <- topLevelOptions.toSeq.sortBy(_.name)) {
       reporter.info("%-20s %s".format(opt.usageOption, opt.usageDesc))
@@ -155,7 +158,11 @@ object Main {
           initReporter.error("Unknown solver(s): "+unknown.mkString(", ")+" (Available: "+available.mkString(", ")+")")
         }
         settings = settings.copy(selectedSolvers = ss.toSet)
-
+      case LeonFlagOption("memo", value) =>
+        settings = settings.copy(memo  = value, terminateAfterEachPhase = false)
+      // FIXME is this the correct place to put it? 
+      case LeonFlagOption("no-verify", value) =>
+        settings = settings.copy(verify = !value)
       case LeonValueOption("debug", ListValue(sections)) =>
         val debugSections = sections.flatMap { s =>
           if (s == "all") {
@@ -210,6 +217,9 @@ object Main {
     import xlang.XLangAnalysisPhase
     import verification.AnalysisPhase
     import repair.RepairPhase
+    import memoization.{RemoveVerifiedPhase, MemoizationPhase}
+    import purescala.RestoreMethods
+    import utils.FileOutputPhase
 
     val pipeSanityCheck : Pipeline[Program, Program] = 
       if(!settings.xlang)
@@ -231,10 +241,22 @@ object Main {
         TerminationPhase
       } else if (settings.xlang) {
         XLangAnalysisPhase
+      } else if (settings.memo) {
+        if (settings.verify) {
+          AnalysisPhase andThen 
+          RemoveVerifiedPhase andThen 
+          MemoizationPhase andThen 
+          RestoreMethods andThen
+          FileOutputPhase
+        } else {
+          MemoizationPhase andThen 
+          RestoreMethods andThen
+          FileOutputPhase
+        }
       } else if (settings.verify) {
         purescala.FunctionClosure andThen AnalysisPhase
       } else {
-        purescala.RestoreMethods andThen utils.FileOutputPhase
+        RestoreMethods andThen FileOutputPhase
       }
     }
 

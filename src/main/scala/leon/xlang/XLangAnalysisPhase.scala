@@ -86,7 +86,7 @@ object XLangAnalysisPhase extends LeonPhase[Program, VerificationReport] {
       }
     }
 
-    new VerificationReport(freshFtoVcs)
+    new VerificationReport(vr.program,freshFtoVcs)
   }
 
 }

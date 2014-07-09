@@ -12,7 +12,8 @@ import purescala.Trees._
 import purescala.TreeOps.{functionCallsOf,preMap}
 import purescala.DefOps.preMapOnFunDef
 import purescala.TypeTrees._
-
+import purescala.Extractors.TopLevelAnds
+import purescala.Constructors._
 import verification._
 
 
@@ -86,29 +87,32 @@ object RemoveVerifiedPhase extends LeonPhase[VerificationReport, Program] {
   private def processVerified(funDef : FunDef, vcs : Seq[VerificationCondition]) : FunDef = {
 
     /* Postconditions */
-    val postCon = funDef.postcondition
-    // Separate postconditions
-    val postCons : (Identifier, Seq[Expr]) = postCon match {
-      case Some( (id, And(args)) ) => (id, args.sortWith{ (e1,e2) => e1.getPos < e2.getPos })
-      case Some( (id, cond     ) ) => (id, Seq(cond))
-      case None                    => (FreshIdentifier("_"), Seq())
-    }
+    val finalPostcons = funDef.postcondition match {
+      case None => None
+      case Some(post) =>
+        val res = FreshIdentifier("res", funDef.returnType, true)
+        val postCon = application(post, Seq(Variable(res)))
+        // Separate postconditions
+        val postCons: Seq[Expr] = {
+          val TopLevelAnds(es) = postCon
+          es.sortWith{ (e1,e2) => e1.getPos < e2.getPos }
+        }
 
-    // Get the postcondition VCs, make sure they are in the right order.
-    // Because InductionTactic may generate multiple conditions from one expr. we have to group them
-    val verifiedPostCons = vcs. filter { 
-      _.kind == VCPostcondition 
-    }. sortWith { 
-      (vc1,vc2) => vc1.getPos < vc2.getPos 
-    }. groupBy { 
-      _.getPos 
-    }.toSeq.sortWith { (x1,x2) => x1._1 < x2._1 }
-    
-    // Now keep the original unverified postCons.
-    val finalPostcons = postCons._2 zip verifiedPostCons collect { 
-      case (pc, (_,vpc)) if vpc exists { _.value != Some(true) } => pc
+        // Get the postcondition VCs, make sure they are in the right order.
+        // Because InductionTactic may generate multiple conditions from one expr. we have to group them
+        val verifiedPostCons = vcs.filter { 
+          _.kind == VCPostcondition 
+        }. sortWith {
+          (vc1,vc2) => vc1.getPos < vc2.getPos
+        }. groupBy {
+          _.getPos
+        }.toSeq.sortWith { (x1,x2) => x1._1 < x2._1 }
+        
+        // Now keep the original unverified postCons.
+        Some(res, postCons zip verifiedPostCons collect {
+          case (pc, (_,vpc)) if vpc exists { _.value != Some(true) } => pc
+        })
     }
-    
     
     /* Preconditions */
 
@@ -117,7 +121,7 @@ object RemoveVerifiedPhase extends LeonPhase[VerificationReport, Program] {
       case Some(bd) => functionCallsOf(bd).toSeq.filter { _.tfd.hasPrecondition }
       case None => Seq()
     }).sortWith { (f1, f2) => f1.getPos < f2.getPos }
-    
+
     // Verified preconditions of funDef, sorted by position
     val verifiedPrecons = vcs.filter { 
       _.kind == VCPrecondition 
@@ -137,15 +141,12 @@ object RemoveVerifiedPhase extends LeonPhase[VerificationReport, Program] {
       }
     ).toMap
  
-    
-    
     val toRet = withExpandedPrecondition(funDef)
-    
-    
-    toRet.postcondition = finalPostcons.length match {
-      case 0 => None 
-      case 1 => Some( (postCons._1, finalPostcons.head) )
-      case _ => Some( (postCons._1, And(finalPostcons)) )
+       
+    toRet.postcondition = finalPostcons match {
+      case None | Some((_, Seq())) => None
+      case Some((res, Seq(e)))     => Some(Lambda(Seq(ValDef(res)), e))
+      case Some((res, more)  )     => Some(Lambda(Seq(ValDef(res)), andJoin(more)))
     }
 
     // Add the extra field to all function calls with precond.

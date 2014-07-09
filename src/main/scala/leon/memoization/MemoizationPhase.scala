@@ -55,7 +55,7 @@ object MemoizationPhase extends TransformationPhase {
     
     // All unproven VCs that we receive from the previous pipeline phases
     val unprovenVCs = p.definedFunctions flatMap {
-      fn => fn.precondition.toSeq ++ fn.postcondition.toSeq.map {_._2}
+      fn => fn.precondition.toSeq ++ fn.postcondition.toSeq
     }
     dbg("I have these conditions")
     dbg( unprovenVCs map { con => 
@@ -77,9 +77,6 @@ object MemoizationPhase extends TransformationPhase {
       // ... and add the functions the user has annotated with forceMemo
       (p.definedFunctions filter { _.annotations.contains("forceMemo") } ).toSet
     dbg("I found these candidates:\n" + allCandidates.map {_.id.name}.mkString("\n"))
-    
-    
-    
     
     // Filter these to have the desired form
     val recMemo = allCandidates filter { f =>  

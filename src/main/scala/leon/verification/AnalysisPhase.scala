@@ -25,6 +25,8 @@ object AnalysisPhase extends LeonPhase[Program,VerificationReport] {
 
   override val definedOptions : Set[LeonOptionDef] = Set(
     LeonValueOptionDef("functions", "--functions=f1:f2", "Limit verification to f1,f2,..."),
+    LeonFlagOptionDef("fine-grain", "--fine-grain",      "Fine-grain VCs before giving them to the solver. Unsound with induction, use for runtime checks etc."),
+    LeonValueOptionDef("solvers",   "--solvers=s1,s2",   "Use solvers s1 and s2 (fairz3,enum)", default = Some("fairz3")),
     LeonValueOptionDef("timeout",   "--timeout=T",       "Timeout after T seconds when trying to prove a verification condition.")
   )
 
@@ -178,7 +180,8 @@ object AnalysisPhase extends LeonPhase[Program,VerificationReport] {
 
   def run(ctx: LeonContext)(program: Program) : VerificationReport = {
     var filterFuns: Option[Seq[String]] = None
-    var timeout: Option[Int]             = None
+    var timeout: Option[Int]            = None
+    var fineGrain                       = false
 
     val reporter = ctx.reporter
 
@@ -186,9 +189,11 @@ object AnalysisPhase extends LeonPhase[Program,VerificationReport] {
       case LeonValueOption("functions", ListValue(fs)) =>
         filterFuns = Some(fs)
 
-
       case v @ LeonValueOption("timeout", _) =>
         timeout = v.asInt(ctx)
+
+      case LeonFlagOption("fine-grain", v) =>
+        fineGrain = v
 
       case _ =>
     }
@@ -203,7 +208,7 @@ object AnalysisPhase extends LeonPhase[Program,VerificationReport] {
         entrySolver
     }
 
-    val vctx = VerificationContext(ctx, program, mainSolver, reporter)
+    val vctx = VerificationContext(ctx, program, mainSolver, fineGrain, reporter)
 
     reporter.debug("Running verification condition generation...")
     val vcs = generateVerificationConditions(vctx, filterFuns)

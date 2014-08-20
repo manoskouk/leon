@@ -9,6 +9,7 @@ import purescala.Trees._
 import purescala.TypeTrees._
 import purescala.Common._
 import purescala.RestoreMethods
+import purescala.Extractors._
 import memoization._
 
 import verification.AnalysisPhase
@@ -23,7 +24,81 @@ import org.scalatest.matchers.ShouldMatchers._
 
 import java.io.{BufferedWriter, FileWriter, File}
 
+// Which tests we are performing
+class MemoTestOptions {
+  val repetitionsAndSizes : Seq[(Int, Int)]
+  val testOutputValidity  : Boolean  // Test if output file is valid (Pure)Scala
+  val testWithVerify      : Boolean  // Verify programs and only memoize unproven functions
+  val testOutputs         : Boolean  // See if program outputs match + performance
 
+  val testOriginal        : Boolean // False to test only new, if original is too slow
+  val testOriginalR       : Boolean
+  val testTrans           : Boolean
+  val testTransR          : Boolean
+
+  val applyTransform      : Boolean  // Apply memo transform (false if you have outputs)
+  val testInc             : Boolean // Test incremental benchmarks
+  val testBulk            : Boolean  // Test bulk benchmarks
+  val testPoly            : Boolean 
+  val library             : Boolean
+}
+
+object MemoTestRegression extends MemoTestOptions {
+
+  val repetitionsAndSizes = Seq(
+    (20, 1),
+    (80, 1)
+  )
+
+  val testOutputValidity  = true  // Test if output file is valid (Pure)Scala
+  val testWithVerify      = true  // Verify programs and only memoize unproven functions
+  val testOutputs         = false // See if program outputs match + performance
+
+  val testOriginal        = true // False to test only new, if original is too slow
+  val testOriginalR       = true
+  val testTrans           = true
+  val testTransR          = true
+
+  val applyTransform      = true  // Apply memo transform (false if you have outputs)
+  val testInc             = true // Test incremental benchmarks
+  val testBulk            = true  // Test bulk benchmarks
+  val testPoly            = false
+  val library             = false
+  
+}
+
+
+object MemoTestPerformance extends MemoTestOptions {
+
+  val repetitionsAndSizes = Seq(
+    (100,100),
+    (250,100),
+    (500,50),
+    (1000,30),
+    (1500,25),
+    (2000,20)
+  )
+
+  val testOutputValidity  = true  // Test if output file is valid (Pure)Scala
+  val testWithVerify      = true  // Verify programs and only memoize unproven functions
+  val testOutputs         = false // See if program outputs match + performance
+
+  val testOriginal        = false// False to test only new, if original is too slow
+  val testOriginalR       = false
+  val testTrans           = false
+  val testTransR          = true
+
+  val applyTransform      = true  // Apply memo transform (false if you have outputs)
+  val testInc             = true // Test incremental benchmarks
+  val testBulk            = true  // Test bulk benchmarks
+  val testPoly            = false
+  val library             = false
+  
+}
+
+class HowToTest extends Enumeration
+case object Incremental extends HowToTest // e.g. insertions, one after the other
+case object Bulk        extends HowToTest // e.g. sorting, one time
 
 class MemoizationTest extends leon.test.LeonTestSuite {
 
@@ -35,7 +110,6 @@ class MemoizationTest extends leon.test.LeonTestSuite {
     case (TupleType(tps1), TupleType(tps2)) => 
       tps1.length == tps2.length &&
       (tps1 zip tps2 forall { case (tp1, tp2) => looseTypeEq(tp1, tp2) })
-    case (ListType(base1)     , ListType(base2)    ) => looseTypeEq(base1, base2)
     case (SetType(base1)      , SetType(base2)     ) => looseTypeEq(base1, base2)
     case (MultisetType(base1) , MultisetType(base2)) => looseTypeEq(base1, base2)
     case (MapType(from1, to1) , MapType(from2, to2)) => 
@@ -61,32 +135,28 @@ class MemoizationTest extends leon.test.LeonTestSuite {
 
     def localEq(e1:Expr, e2:Expr) : Boolean = (e1, e2) match { 
       case ( IntLiteral(i1), IntLiteral(i2) ) => 
-        i1 == i2 
-      case ( StringLiteral(s1), StringLiteral(s2) ) => 
-        s1 == s2
+        i1 == i2
+      case (InfiniteIntegerLiteral(i1), InfiniteIntegerLiteral(i2)) =>
+        i1 == i2
       case ( BooleanLiteral(b1), BooleanLiteral(b2) ) =>  
         b1 == b2
       case ( UnitLiteral(), UnitLiteral() ) => 
         true
-      case ( FiniteArray(exs1), FiniteArray(exs2) ) =>
-        if (exs1.length != exs2.length) false 
-        else { 
-          exs1 zip exs2 foreach { q += _ } 
+      case ( FiniteArray(exs1, def1, l1), FiniteArray(exs2, def2, l2) ) =>
+        if (exs1.size != exs2.size || def1.isDefined == def2.isDefined) false
+        else {
+          def1 foreach { df => q += ((df, def2.get)) }
+          q += ((l1,l2))
+          exs1 foreach { case (id, e) => q += ((e, exs2.getOrElse(id, return false))) }
           true
         }
-      case ( NilList(t1), NilList(t2) ) => 
-        looseTypeEq(t1,t2)
-      case ( Cons(h1, t1) , Cons(h2,t2) ) => {
-        q += ((h1,h2),(t1,t2))
-        true
-      }
       case ( Tuple(exs1), Tuple(exs2) ) =>  
         if (exs1.length != exs2.length) false 
         else { 
           exs1 zip exs2 foreach { q += _ } ;
           true
         }
-      case ( Error(_), Error(_)) => 
+      case ( Error(_, _), Error(_, _)) => 
         true      
       case ( CaseClass(c1, args1), CaseClass(c2, args2) ) => 
         
@@ -275,8 +345,7 @@ class MemoizationTest extends leon.test.LeonTestSuite {
       val timeOut = 2
       val settings = testContext.settings.copy(
         memo = true, 
-        debugSections = Set(DebugSectionMemoization), 
-        injectLibrary = MemoTestOptions.library
+        debugSections = Set(DebugSectionMemoization)
       )
       val ctx = testContext.copy(
         // We want a reporter that actually prints some output
@@ -342,8 +411,6 @@ class MemoizationTest extends leon.test.LeonTestSuite {
       // Compile to bytecode, check output equality and performance
       
       if (testOutputs) {
-
-        
 
         ctx.reporter.info("Compiling original to bytecode")
         val (init1, compiled1) = compileTestFun(origAST,ctx)
@@ -412,3 +479,5 @@ class MemoizationTest extends leon.test.LeonTestSuite {
 
   
 }
+
+

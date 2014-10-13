@@ -60,4 +60,34 @@ object Simplifiers {
     // Simplify first using stable simplifiers
     fixpoint(simple, 5)(e)
   }
+
+  def synthesisSafeSimplifier(ctx: LeonContext, p: Program)(e: Expr): Expr = {
+    val uninterpretedZ3 = SolverFactory(() => new UninterpretedZ3Solver(ctx, p))
+
+    val simplifiers = List[Expr => Expr](
+      simplifyTautologies(uninterpretedZ3)(_),
+      simplifyLets _,
+      decomposeIfs _,
+      matchToIfThenElse _,
+      simplifyPaths(uninterpretedZ3)(_),
+      rewriteTuples _,
+      evalGround(ctx, p),
+      simplifyArithmetic _,
+      simplifySets _,
+      normalizeExpression _
+    )
+
+    val simple = { expr: Expr =>
+      simplifiers.foldLeft(expr){ case (x, sim) => 
+        sim(x)
+      }
+    }
+
+    // Simplify first using stable simplifiers
+    val s = fixpoint(simple, 5)(e)
+
+    // Clean up ids/names
+    (new ScopeSimplifier).transform(s)
+  }
+
 }

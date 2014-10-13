@@ -14,6 +14,8 @@ object Rules {
     Unification.DecompTrivialClash,
     Unification.OccursCheck, // probably useless
     Disunification.Decomp,
+    InlineAndSimplify,
+    Simplify,
     ADTDual,
     OnePoint,
     Ground,
@@ -30,6 +32,7 @@ object Rules {
     DetupleOutput,
     DetupleInput,
     ADTSplit,
+    //InlineFunctions,
     InlineHoles,
     IntegerEquation,
     IntegerInequalities

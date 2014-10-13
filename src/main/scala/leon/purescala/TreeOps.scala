@@ -795,7 +795,7 @@ object TreeOps {
     case Int32Type                  => IntLiteral(0)
     case CharType                   => CharLiteral('a')
     case BooleanType                => BooleanLiteral(false)
-    case SetType(baseType)          => FiniteSet(Set()).setType(tpe)
+    case SetType(baseType)          => EmptySet(tpe)
     case MapType(fromType, toType)  => FiniteMap(Seq()).setType(tpe)
     case TupleType(tpes)            => Tuple(tpes.map(simplestValue))
     case ArrayType(tpe)             => ArrayFill(IntLiteral(0), simplestValue(tpe))
@@ -1492,6 +1492,105 @@ object TreeOps {
 
     fix(simplePostTransform(simplify0))(expr)
   }
+
+
+  def simplifySets( e : Expr ) : Expr = { // TODO: Fix positions
+    val simplify0: PartialFunction[Expr, Expr] = {
+ 
+      // Empty sets
+      case ElementOfSet(elem, EmptySet(_)) => BooleanLiteral(false)
+      case SetUnion(EmptySet(_), s2) => s2
+      case SetUnion(s1, EmptySet(_)) => s1
+      case SetIntersection(_, e@EmptySet(_)) => e
+      case SetIntersection(e@EmptySet(_), _) => e
+      case SetDifference(e@EmptySet(_), _) => e
+      case SetDifference(s1, EmptySet(_)) => s1
+      case SubsetOf(EmptySet(_), _) => BooleanLiteral(true)
+      case SubsetOf(_, EmptySet(_)) => BooleanLiteral(false)
+      case SetMin(EmptySet(tp)) => Error("Minimum of empty set").setType(SetType(tp))
+      case SetMax(EmptySet(tp)) => Error("Maximum of empty set").setType(SetType(tp))
+
+      // Finite sets
+      case ElementOfSet(elem, FiniteSet(elems)) if elems contains elem => 
+        BooleanLiteral(true)
+      case SetCardinality(FiniteSet(elems)) => 
+        IntLiteral(elems.size)
+      case SetUnion(FiniteSet(elems1), FiniteSet(elems2)) => 
+        FiniteSet(elems1 ++ elems2)
+      case SetIntersection(FiniteSet(elems1), FiniteSet(elems2)) => 
+        FiniteSet(elems1 & elems2)
+      case SetDifference(FiniteSet(elems1), FiniteSet(elems2)) => 
+        FiniteSet(elems1 -- elems2)
+      case SubsetOf(FiniteSet(elems1), FiniteSet(elems2)) if (elems1 subsetOf elems2) => 
+        BooleanLiteral(true)
+      case SetMin(FiniteSet(s)) if s.size == 1 => s.head
+      case SetMax(FiniteSet(s)) if s.size == 1 => s.head
+
+      
+      // Equal sets
+      case SetUnion(set1, set2) if set1 == set2 => 
+        set1
+      case sd@SetDifference(set1, set2) if set1 == set2 => 
+        EmptySet(sd.getType)
+      case SetIntersection(set1, set2) if set1 == set2 => 
+        set1
+      case SubsetOf(set1, set2) if set1 == set2 =>
+        BooleanLiteral(false)
+
+      // Combination of operators
+      case SetUnion(s1, SetIntersection(s2, s3)) if s1 == s2 || s1 == s3 => s1
+      case SetUnion(SetIntersection(s2, s3), s1) if s1 == s2 || s1 == s3 => s1
+      case SetUnion(s1, sd@SetDifference(s2, s3)) if s1 == s2 => sd
+      case SetUnion(s1, sd@SetDifference(s2, s3)) if s1 == s3 => 
+        SetUnion(s1,s2)
+      case SetUnion(SetDifference(s1, s2), s3) if s1 == s3 => s1
+      case SetUnion(SetDifference(s1, s2), s3) if s2 == s3 => 
+        SetUnion(s1,s2)
+
+      case SetIntersection(s1, SetUnion(s2,s3)) if s1 == s2 || s1 == s3 => s1
+      case SetIntersection(SetUnion(s2,s3), s1) if s1 == s2 || s1 == s3 => s1
+      case SetIntersection(s1, sd@SetDifference(s2,s3)) if s1 == s2 => sd
+      case SetIntersection(sd@SetDifference(s2,s3), s1) if s1 == s2 => sd
+      case si@SetIntersection(s1, SetDifference(s2,s3)) if s1 == s3 => 
+        EmptySet(si.getType)
+      case si@SetIntersection(SetDifference(s2,s3), s1) if s1 == s3 => 
+        EmptySet(si.getType)
+
+      case sd@SetDifference(set1, SetUnion(set2, set3)) if set1 == set2 || set2 == set3 =>
+        EmptySet(sd.getType)
+      case sd@SetDifference(set1, SetIntersection(set2, set3)) if set1 == set2 =>
+        SetDifference(set1,set2).copiedFrom(sd)
+      case sd@SetDifference(set1, SetIntersection(set2, set3)) if set1 == set3 =>
+        SetDifference(set1,set3).copiedFrom(sd)
+      case sd@SetDifference(SetIntersection(set2, set3),set1) if set1 == set2 || set1 == set3 =>
+        EmptySet(sd.getType)
+      case sd@SetDifference(set1, set2) =>
+        val TopLevelSetUnions(tops1) = set1
+        if (tops1 contains set2)
+          SetDifference((tops1 diff Seq(set2)) reduce SetUnion, set2)
+        else sd
+
+      case SubsetOf(s1, SetUnion(s2,s3)) if s1 == s2 || s1 == s3 =>
+        BooleanLiteral(true)
+      case SubsetOf(SetUnion(s1,s2), s3) if s1 == s3 =>
+        SubsetOf(s2,s1)
+      case SubsetOf(SetUnion(s1,s2), s3) if s2 == s3 =>
+        SubsetOf(s1,s2)
+      case SubsetOf(s1, SetDifference(s2, s3)) if s1 == s2 =>
+        BooleanLiteral(true)
+      case SubsetOf(s1, SetDifference(s2, s3)) if s1 == s3 =>
+        Equals(s1, FiniteSet(Set()))
+      case SubsetOf(s1, SetIntersection(s2,s3)) if s1 == s2 =>
+        SubsetOf(s1,s3)
+      case SubsetOf(s1, SetIntersection(s2,s3)) if s1 == s3 =>
+        SubsetOf(s1,s2)
+      case SubsetOf(SetIntersection(s1,s2), s3) if s1 == s3 || s2 == s3 =>
+        BooleanLiteral(true)
+    }
+
+    postMap(simplify0.lift,true)(e)
+  }
+
 
   /**
    * Checks whether a predicate is inductive on a certain identfier.

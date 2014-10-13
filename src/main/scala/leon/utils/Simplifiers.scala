@@ -22,6 +22,8 @@ object Simplifiers {
       patternMatchReconstruction _,
       rewriteTuples _,
       evalGround(ctx, p),
+      simplifyArithmetic _,
+      simplifySets _,
       normalizeExpression _
     )
 

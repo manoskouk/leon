@@ -207,6 +207,24 @@ object Extractors {
     }
   }
 
+  object EmptySet { 
+    def apply(tp : TypeTree) = FiniteSet(Set()).setType(tp)
+    def unapply(e : Expr) : Option[TypeTree] = e match {
+      case fs@FiniteSet(s) if s.isEmpty => Some(fs.getType)
+      case _ => None
+    }
+  }
+
+  object TopLevelSetUnions {
+    def unapply(e : Expr) : Option[Seq[Expr]] = e match {
+      case SetUnion(s1, s2) => 
+        val TopLevelSetUnions(top1) = s1
+        val TopLevelSetUnions(top2) = s2
+        Some(top1 ++ top2)
+      case other => Some(Seq(other))
+    }
+  }
+
   object IsTyped {
     def unapply[T <: Typed](e: T): Option[(T, TypeTree)] = Some((e, e.getType))
   }

@@ -1430,6 +1430,38 @@ object TreeOps {
     replace(vars.map(id => Variable(id) -> valuator(id)).toMap, expr)
   }
 
+  def inlineFunction(fi : FunctionInvocation) : Expr = {
+    val FunctionInvocation(TypedFunDef(fd, tps), realArgs) = fi
+    val formalArgs = fd.params
+    val typeMap = fd.tparams.zip(tps).toMap
+    val withCorrectType = instantiateType(fd.body.get, typeMap, Map())
+    replaceFromIDs(
+      formalArgs.map {_.id}.zip(realArgs).toMap,
+      withCorrectType
+    )
+  }
+ 
+  def inlineMethod(mi : MethodInvocation) : Expr = {
+    val MethodInvocation(receiver, cd, TypedFunDef(fd, tps), args) = mi
+    val receiverType = receiver.getType.asInstanceOf[ClassType]
+
+    val formalArgs = This(receiverType) +: (fd.params map { _.toVariable })
+    val realArgs = receiver +: args
+    
+    val formalTypes = cd.tparams ++ fd.tparams
+    val realTypes = receiverType.tps ++ tps
+    
+    val withCorrectType = instantiateType(
+      fd.body.get, 
+      formalTypes.zip(realTypes).toMap,
+      Map()
+    )
+    replace(
+      formalArgs.zip(realArgs).toMap,
+      withCorrectType
+    )
+  }
+
   /**
    * Simple, local simplification on arithmetic
    *

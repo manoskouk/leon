@@ -286,4 +286,9 @@ object TypeTreeOps {
       res
     }
   }
+
+  def typeParameters(t : TypeTree) : Set[TypeParameter] = t match {
+    case tp : TypeParameter => Set(tp)
+    case NAryType(subTrees, _) => subTrees.flatMap(typeParameters).toSet
+  }
 }

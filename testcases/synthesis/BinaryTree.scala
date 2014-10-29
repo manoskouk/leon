@@ -16,6 +16,11 @@ object BinaryTree {
     content(out) == (content(in) -- Set(v))
   }
 
+  def merge (t1 : Tree, t2 : Tree) : Tree = { t1 match {
+    case Leaf() => t2
+    case Node(l,v,r) => Node(merge(l,t2),v,r)
+  }} ensuring { content(_) == content(t1) ++ content(t2) }
+
   def deleteSubProblem(left : Tree, leftR: Tree, value: Int, rightRleft: Tree, rightRvalue: Int, rightRright: Tree, rightR: Tree, right: Tree, toRemove : Int) = choose { (out : Tree) =>
     content(out) == (content(Node(left, value, right)) -- Set(toRemove)) && content(leftR) == (content(left) -- Set(toRemove)) && rightR == Node(rightRleft, rightRvalue, rightRright) && content(Node(rightRleft, rightRvalue, rightRright)) == (content(right) -- Set(toRemove)) && value == toRemove
   }

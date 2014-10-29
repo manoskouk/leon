@@ -12,6 +12,12 @@ object AVLTree {
     case Node(l, v, r) => content(l) ++ Set(v) ++ content(r)
   }
 
+
+  def size(t : Tree) : Int = t match {
+    case Leaf() => 0
+    case Node(l,_,r) => 1 + size(l) + size(r)
+  }
+
   def height(t: Tree): Int = t match {
     case Leaf() => 0
     case Node(l, _, r) =>
@@ -73,7 +79,11 @@ object AVLTree {
   }
 
   def insertBalancedSynth(in: Tree, v: Int) = choose {
-    (out : Tree) => isBalanced(in) && (content(out) == (content(in) ++ Set(v))) && isBalanced(out)
+    (out : Tree) =>  
+      isBalanced(in) && 
+      (content(out) == (content(in) ++ Set(v))) && 
+      isBalanced(out) &&
+      size(out) <= size(in) + 1
   }
 
   def insertSortedSynth(in : Tree, v : Int) = choose {

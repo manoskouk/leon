@@ -4,7 +4,7 @@ version := "2.3"
 
 organization := "ch.epfl.lara"
 
-scalaVersion := "2.11.2"
+scalaVersion := "2.11.4"
 
 scalacOptions ++= Seq(
     "-deprecation",

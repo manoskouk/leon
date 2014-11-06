@@ -81,7 +81,7 @@ class TemplateGenerator[T](val encoder: TemplateEncoder[T]) {
 
     def requireDecomposition(e: Expr) = {
       exists{
-        case (_: FunctionInvocation) | (_: Assert) | (_: Ensuring) | (_: Choose) => true
+        case (_: FunctionInvocation) | (_: Assert) | (_: Ensuring) | (_: Choose) | (_: RepairHole) => true
         case _ => false
       }(e)
     }
@@ -158,6 +158,11 @@ class TemplateGenerator[T](val encoder: TemplateEncoder[T]) {
             Variable(newExpr)
           }
         }
+
+        case h @ RepairHole(_, _) =>
+          val hid = FreshIdentifier("hole", true).setType(h.getType)
+          exprVars += hid
+          Variable(hid)
 
         case c @ Choose(ids, cond) =>
           val cid = FreshIdentifier("choose", true).setType(c.getType)

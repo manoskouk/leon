@@ -6,6 +6,7 @@ package codegen
 import purescala.Common._
 import purescala.Definitions._
 import purescala.Trees._
+import purescala.TreeOps.simplestValue
 import purescala.TypeTrees._
 import purescala.TypeTreeOps.instantiateType
 import utils._
@@ -572,6 +573,9 @@ trait CodeGeneration {
         ch << InvokeSpecial(ErrorClass, constructorName, "(Ljava/lang/String;)V")
         ch << ATHROW
 
+      case rh: RepairHole =>
+        mkExpr(simplestValue(rh.getType), ch) // It is expected to be invalid, we want to repair it
+
       case choose @ Choose(_, _) =>
         val prob = synthesis.Problem.fromChoose(choose)
 
@@ -604,7 +608,7 @@ trait CodeGeneration {
         mkBranch(b, al, fl, ch, canDelegateToMkExpr = false)
         ch << Label(fl) << POP << Ldc(0) << Label(al)
 
-      case _ => throw CompilationException("Unsupported expr. : " + e) 
+      case _ => throw CompilationException("Unsupported expr. : " + e +"("+e.getClass+")") 
     }
   }
 

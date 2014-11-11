@@ -109,11 +109,11 @@ class Repairman(ctx: LeonContext, program: Program, fd: FunDef) {
                 reporter.info("Failed :(, but I learned: "+ces.mkString("  |  "))
               case None =>
                 solutions ::= (sol, expr, fds)
-                reporter.info(ASCIIHelpers.title("ZUCCESS!"))
+                reporter.info(ASCIIHelpers.title("ZÜCCESS!"))
             }
           } else {
             solutions ::= (sol, expr, fds)
-            reporter.info(ASCIIHelpers.title("ZUCCESS!"))
+            reporter.info(ASCIIHelpers.title("ZÜCCESS!"))
           }
         }
 
@@ -123,7 +123,7 @@ class Repairman(ctx: LeonContext, program: Program, fd: FunDef) {
         }
 
         if (solutions.isEmpty) {
-            reporter.info(ASCIIHelpers.title("FAILURZ!"))
+            reporter.info(ASCIIHelpers.title("FÄILURZ!"))
         } else {
           reporter.info(ASCIIHelpers.title("Solutions"))
           for (((sol, expr, fds), i) <- solutions.zipWithIndex) {

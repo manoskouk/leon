@@ -62,23 +62,27 @@ object ASCIIHelpers {
       (0 until cellsPerRow).map(i => constraints.getOrElse((i, i), 1))
     }
 
-    def render: String = {
+    def render : String = render(0)
+    def render(offset : Int): String = {
+
       val colSizes = computeColumnSizes
 
       val fullWidth = colSizes.sum + colSizes.size*2
 
       val sb = new StringBuffer
+      
+      def appendOffset = sb append " "*offset 
 
-      sb append "  ┌─"+("─"*title.size)+"─┐\n"
-      sb append "╔═╡ "+      title     +" ╞" + ("═" * (fullWidth-title.size-5)) + "╗\n"
-      sb append "║ └─"+("─"*title.size)+"─┘" + (" " * (fullWidth-title.size-5)) + "║\n"
+      appendOffset; sb append "  ┌─"+("─"*title.size)+"─┐\n"
+      appendOffset; sb append "╔═╡ "+      title     +" ╞" + ("═" * (fullWidth-title.size-5)) + "╗\n"
+      appendOffset; sb append "║ └─"+("─"*title.size)+"─┘" + (" " * (fullWidth-title.size-5)) + "║\n"
 
       for (r <- rows) r match {
         case Separator =>
-          sb append "╟" + ("┄" * fullWidth) + "╢\n"
+          appendOffset; sb append "╟" + ("┄" * fullWidth) + "╢\n"
 
         case Row(cells) =>
-          sb append "║ "
+          appendOffset; sb append "║ "
           var i = 0
           for (c <- cells) {
             if (i > 0) {
@@ -94,10 +98,10 @@ object ASCIIHelpers {
 
             i += c.spanning
           }
-          sb append " ║\n"
+          sb append (" ║\n")
       }
 
-      sb append "╚" + ("═" * fullWidth) + "╝"
+      appendOffset; sb append "╚" + ("═" * fullWidth) + "╝"
 
       sb.toString
     }

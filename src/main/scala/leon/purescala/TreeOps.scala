@@ -755,35 +755,70 @@ object TreeOps {
       }
     }
 
-    def rec(in: Expr, pattern: Pattern): Expr = {
+    /*
+     * This function returns a pair:
+     * The first element is interpreted as a condition for in to match pattern
+     * The second, if present, gives a structural representation of the pattern. 
+     * E.g. if pattern is 'case CaseClass((a,b), 2) =>' 
+     * it will return Some( CaseClass((a,b),2) ), 
+     * whereas for CaseClass(_,_) it will return None.
+     * If it returns Some(s), it should be interpreted as s == in.
+     */
+    def rec(in: Expr, pattern: Pattern): (Expr, Option[Expr]) = {
       pattern match {
-        case WildcardPattern(ob) => bind(ob, in)
+        case WildcardPattern(ob) => 
+          (bind(ob,in), if (includeBinders) ob map Variable else None)
         case InstanceOfPattern(ob, ct) =>
           ct match {
             case _: AbstractClassType =>
-              bind(ob, in)
+              (bind(ob, in), None)
+
+            case cct : CaseClassType if cct.classDef.fields.isEmpty =>
+              (bind(ob, in), Some(CaseClass(cct, Seq())))
 
             case cct: CaseClassType =>
-              And(CaseClassInstanceOf(cct, in), bind(ob, in))
+              (And(CaseClassInstanceOf(cct, in), bind(ob, in)), None)
           }
+
         case CaseClassPattern(ob, cct, subps) =>
           assert(cct.fields.size == subps.size)
-          val pairs = cct.fields.map(_.id).toList zip subps.toList
-          val subTests = pairs.map(p => rec(CaseClassSelector(cct, in, p._1), p._2))
-          val together = And(bind(ob, in) +: subTests)
-          And(CaseClassInstanceOf(cct, in), together)
+          val subExprs = cct.fields.toList map { f => CaseClassSelector(cct, in, f.id) }
+          val pairs = subExprs zip subps.toList
+          val (subPreds, subStructurals) = pairs.map {case (e,p) => rec(e, p)}.unzip
+          
+          if (subStructurals forall { _.isDefined }) 
+            (And(bind(ob,in) +: subPreds), Some(CaseClass(cct, subStructurals.flatten)))
+          else {
+            val structConditions = subExprs zip subStructurals collect {
+              case (e, Some(s)) => Equals(e,s)
+            }
+            (And(bind(ob,in) +: CaseClassInstanceOf(cct,in) +: (subPreds ++ structConditions)), None)
+          }
 
-        case TuplePattern(ob, subps) => {
+        case TuplePattern(ob, subps) => 
           val TupleType(tpes) = in.getType
           assert(tpes.size == subps.size)
-          val subTests = subps.zipWithIndex.map{case (p, i) => rec(TupleSelect(in, i+1).setType(tpes(i)), p)}
-          And(bind(ob, in) +: subTests)
-        }
-        case LiteralPattern(ob,lit) => And(Equals(in,lit), bind(ob,in))
+          val subExprs = for ((tp, i) <- tpes.zipWithIndex) yield TupleSelect(in,i+1).setType(tp)
+          val pairs = subExprs zip subps
+          val (subPreds, subStructurals) = pairs.map{case (e, p) => rec(e, p)}.unzip
+          
+          if (subStructurals forall { _.isDefined })
+            (And(bind(ob,in) +: subPreds), Some(Tuple(subStructurals.flatten)))
+          else {
+            val structConditions = subExprs zip subStructurals collect {
+              case (e, Some(s)) => Equals(e,s)
+            }
+            (And(bind(ob, in) +: (subPreds ++ structConditions)), None)
+          }
+
+        case LiteralPattern(ob,lit) => (bind(ob,in), Some(lit))
       }
     }
 
-    rec(in, pattern)
+    rec(in, pattern) match { 
+      case (c, None) => c
+      case (c, Some(s)) => And(c, Equals(in,s))
+    }
   }
 
   def mapForPattern(in: Expr, pattern: Pattern) : Map[Identifier,Expr] = pattern match {

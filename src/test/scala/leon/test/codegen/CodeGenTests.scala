@@ -238,14 +238,14 @@ class CodeGenTests extends test.LeonTestSuite {
       object ListWithSumMono {
         abstract class List
         case class Cons(hd : Int, tl : List) extends List
-        case class Nil() extends List     
+        case object Nil extends List     
         
         def sum (l : List) : Int = l match {
-          case Nil() => 0
+          case Nil => 0
           case Cons(x, xs) => x + sum(xs)
         }
         
-        val l = Cons(1, Cons(2, Cons(3, Nil())))
+        val l = Cons(1, Cons(2, Cons(3, Nil)))
         
         def test =  sum(l)
       }""",

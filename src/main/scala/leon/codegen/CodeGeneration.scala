@@ -727,6 +727,13 @@ trait CodeGeneration {
       case Variable(b) =>
         ch << ILoad(slotFor(b)) << IfEq(elze) << Goto(thenn)
 
+      // Special treatment of equality with case objects/empty case classes to avoid 
+      // initialization errors
+      case Equals(l, CaseClass(cct, Seq())) =>
+        mkBranch(CaseClassInstanceOf(cct,l), thenn, elze, ch, canDelegateToMkExpr)
+      case Equals(CaseClass(cct, Seq()), r) =>
+        mkBranch(CaseClassInstanceOf(cct,r), thenn, elze, ch, canDelegateToMkExpr)
+
       case Equals(l,r) =>
         mkExpr(l, ch)
         mkExpr(r, ch)

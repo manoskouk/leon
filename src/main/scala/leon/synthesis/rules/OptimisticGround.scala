@@ -47,7 +47,7 @@ case object OptimisticGround extends Rule("Optimistic Ground") {
                     predicates = valuateWithModelIn(phi, ass, invalidModel) +: predicates
 
                   case (Some(false), _) =>
-                    result = Some(RuleClosed(Solution(BooleanLiteral(true), Set(), Tuple(p.xs.map(valuateWithModel(satModel))).setType(tpe))))
+                    result = Some(RuleClosed(Solution(BooleanLiteral(true), Set(), Tuple(p.xs.map(valuateWithModel(satModel))))))
 
                   case _ =>
                     continue = false

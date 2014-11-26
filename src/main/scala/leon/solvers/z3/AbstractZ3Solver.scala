@@ -661,8 +661,8 @@ trait AbstractZ3Solver
       case arr @ FiniteArray(exprs) => {
         val ArrayType(innerType) = arr.getType
         val arrayType = arr.getType
-        val a: Expr = ArrayFill(IntLiteral(exprs.length), simplestValue(innerType)).setType(arrayType)
-        val u = exprs.zipWithIndex.foldLeft(a)((array, expI) => ArrayUpdated(array, IntLiteral(expI._2), expI._1).setType(arrayType))
+        val a: Expr = ArrayFill(IntLiteral(exprs.length), simplestValue(innerType))
+        val u = exprs.zipWithIndex.foldLeft(a)((array, expI) => ArrayUpdated(array, IntLiteral(expI._2), expI._1))
         rec(u)
       }
       case Distinct(exs) => z3.mkDistinct(exs.map(rec(_)): _*)

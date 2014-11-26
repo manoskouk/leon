@@ -67,7 +67,7 @@ object Solution {
   def unapply(s: Solution): Option[(Expr, Set[FunDef], Expr)] = if (s eq null) None else Some((s.pre, s.defs, s.term))
 
   def choose(p: Problem): Solution = {
-    new Solution(BooleanLiteral(true), Set(), Choose(p.xs, p.phi).setType(TupleType(p.xs.map(_.getType))))
+    new Solution(BooleanLiteral(true), Set(), Choose(p.xs, p.phi))
   }
 
   // Generate the simplest, wrongest solution, used for complexity lowerbound

@@ -1544,19 +1544,8 @@ object TreeOps {
           fdHomo(fd1, fd2) &&
           isHomo(e1, e2)(map + (fd1.id -> fd2.id))
 
-        case (MatchExpr(s1, cs1), MatchExpr(s2, cs2)) =>
-          if (cs1.size == cs2.size) {
-            isHomo(s1, s2) && casesMatch(cs1,cs2)
-          } else {
-            false
-          }
-        
-        case (Gives(s1, cs1), Gives(s2, cs2)) =>
-          if (cs1.size == cs2.size) {
-            isHomo(s1, s2) && casesMatch(cs1,cs2)
-          } else {
-            false
-          }
+        case Same(MatchLike(s1, cs1, _), MatchLike(s2, cs2, _)) =>
+          cs1.size == cs2.size && isHomo(s1, s2) && casesMatch(cs1,cs2)
 
         case (FunctionInvocation(tfd1, args1), FunctionInvocation(tfd2, args2)) =>
           // TODO: Check type params

@@ -228,6 +228,11 @@ object Extractors {
         (m.scrutinee, m.cases, m match {
           case _ : MatchExpr  => matchExpr
           case _ : Gives      => gives
+          case _ : Passes     => 
+            (s, cases) => {
+              val Tuple(Seq(in, out)) = s
+              passes(in,out,cases)
+            }
         })
       }
     }
@@ -244,6 +249,13 @@ object Extractors {
       case CaseClassPattern(b, ct, subs)  => (b, subs,  (b, sp) => CaseClassPattern(b, ct, sp))
       case TuplePattern(b,subs)           => (b, subs,  (b, sp) => TuplePattern(b, sp))
       case LiteralPattern(b, l)           => (b, Seq(), (b, _)  => LiteralPattern(b, l))
+    }
+  }
+
+  object UnwrapTuple {
+    def unapply(e : Expr) : Option[Seq[Expr]] = Option(e) map {
+      case Tuple(subs) => subs
+      case other => Seq(other)
     }
   }
 

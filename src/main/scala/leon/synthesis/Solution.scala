@@ -23,9 +23,9 @@ class Solution(val pre: Expr, val defs: Set[FunDef], val term: Expr, val isTrust
     if (pre == BooleanLiteral(true)) {
       term
     } else if (pre == BooleanLiteral(false)) {
-      Error("Impossible program").setType(term.getType)
+      Error(term.getType, "Impossible program")
     } else {
-      IfExpr(pre, term, Error("Precondition failed").setType(term.getType))
+      IfExpr(pre, term, Error(term.getType, "Precondition failed"))
     }
   }
 
@@ -80,6 +80,6 @@ object Solution {
   }
 
   def failed(p: Problem): Solution = {
-    new Solution(BooleanLiteral(true), Set(), Error("Failed").setType(TupleType(p.xs.map(_.getType))))
+    new Solution(BooleanLiteral(true), Set(), Error(TupleType(p.xs.map(_.getType)), "Failed"))
   }
 }

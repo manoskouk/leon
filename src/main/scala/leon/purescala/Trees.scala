@@ -22,13 +22,15 @@ object Trees {
   }
 
   case class NoTree(tpe: TypeTree) extends Expr with Terminal with Typed {
-    def getType = tpe
+    val getType = tpe
   }
 
   /* This describes computational errors (unmatched case, taking min of an
    * empty set, division by zero, etc.). It should always be typed according to
    * the expected type. */
-  case class Error(description: String) extends Expr with Terminal with MutableTyped
+  case class Error(tpe: TypeTree, description: String) extends Expr with Terminal {
+    val getType = tpe
+  }
 
   case class Require(pred: Expr, body: Expr) extends Expr with Typed {
     def getType = body.getType
@@ -56,8 +58,6 @@ object Trees {
     }
   }
 
-
-  /* Like vals */
   case class Let(binder: Identifier, value: Expr, body: Expr) extends Expr {
     def getType = body.getType
   }
@@ -73,11 +73,16 @@ object Trees {
     def getType = body.getType
   }
 
-
   case class FunctionInvocation(tfd: TypedFunDef, args: Seq[Expr]) extends Expr {
     def getType = tfd.returnType
   }
 
+  /**
+   * OO Trees
+   *
+   * Both MethodInvocation and This get removed by phase MethodLifting. Methods become functions,
+   * This becomes first argument, and MethodInvocation become FunctionInvocation.
+   */
   case class MethodInvocation(rec: Expr, cd: ClassDef, tfd: TypedFunDef, args: Seq[Expr]) extends Expr {
     def getType = {
       // We need ot instanciate the type based on the type of the function as well as receiver

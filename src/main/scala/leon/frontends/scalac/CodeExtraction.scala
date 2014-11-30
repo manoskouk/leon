@@ -1026,7 +1026,7 @@ trait CodeExtraction extends ASTExtractors {
           Tuple(tupleExprs)
 
         case ExErrorExpression(str, tpt) =>
-          Error(str).setType(extractType(tpt))
+          Error(extractType(tpt), str)
 
         case ExTupleExtract(tuple, index) =>
           val tupleExpr = extractTree(tuple)

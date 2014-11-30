@@ -833,7 +833,7 @@ object TreeOps {
           (realCond, newRhs)
         }
 
-        val bigIte = condsAndRhs.foldRight[Expr](Error("Match is non-exhaustive").copiedFrom(m))((p1, ex) => {
+        val bigIte = condsAndRhs.foldRight[Expr](Error(m.getType, "Match is non-exhaustive").copiedFrom(m))((p1, ex) => {
           if(p1._1 == BooleanLiteral(true)) {
             p1._2
           } else {
@@ -882,7 +882,7 @@ object TreeOps {
         val r = postMap({
           case mg @ MapGet(m,k) =>
             val ida = MapIsDefinedAt(m, k)
-            Some(IfExpr(ida, mg, Error("key not found for map access").copiedFrom(mg)).copiedFrom(mg))
+            Some(IfExpr(ida, mg, Error(mg.getType, "Key not found for map access").copiedFrom(mg)).copiedFrom(mg))
 
           case _=>
             None
@@ -1227,7 +1227,7 @@ object TreeOps {
       case Tuple(Seq()) => UnitLiteral()
       case Variable(id) if idMap contains id => Variable(idMap(id))
 
-      case Error(err) => Error(err).setType(mapType(e.getType).getOrElse(e.getType)).copiedFrom(e)
+      case Error(tpe, err) => Error(mapType(tpe).getOrElse(e.getType), err).copiedFrom(e)
       case Tuple(Seq(s)) => pre(s)
 
       case ts @ TupleSelect(t, 1) => t.getType match {

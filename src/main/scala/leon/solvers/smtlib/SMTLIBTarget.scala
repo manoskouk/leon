@@ -339,8 +339,8 @@ trait SMTLIBTarget {
           newBody
         )
 
-      case er @ Error(_) =>
-        val s = declareVariable(FreshIdentifier("error_value").setType(er.getType))
+      case er @ Error(tpe, _) =>
+        val s = declareVariable(FreshIdentifier("error_value").setType(tpe))
         s
 
       case s @ CaseClassSelector(cct, e, id) =>

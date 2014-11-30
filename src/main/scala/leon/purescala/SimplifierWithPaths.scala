@@ -7,6 +7,7 @@ import Trees._
 import TypeTrees._
 import TreeOps._
 import Extractors._
+import Constructors._
 import solvers._
 
 class SimplifierWithPaths(sf: SolverFactory[Solver]) extends TransformerWithPC {
@@ -116,7 +117,7 @@ class SimplifierWithPaths(sf: SolverFactory[Solver]) extends TransformerWithPC {
         case List(theCase) if !scrut.getType.isInstanceOf[AbstractClassType] =>
           // Avoid AbstractClassType as it may lead to invalid field accesses
           replaceFromIDs(mapForPattern(scrut, theCase.pattern), theCase.rhs)
-        case _ => MatchExpr(rs, newCases).copiedFrom(e)
+        case _ => matchExpr(rs, newCases).copiedFrom(e)
       }
 
     case Or(es) =>

@@ -1376,7 +1376,7 @@ trait CodeExtraction extends ASTExtractors {
         case pm @ ExPatternMatching(sel, cses) =>
           val rs = extractTree(sel)
           val rc = cses.map(extractMatchCase(_))
-          MatchExpr(rs, rc)
+          matchExpr(rs, rc)
 
         case t: This =>
           extractType(t) match {

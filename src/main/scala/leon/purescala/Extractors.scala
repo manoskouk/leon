@@ -137,7 +137,7 @@ object Extractors {
               case GuardedCase(b, _, _) => i+=2; GuardedCase(b, es(i-2), es(i-1)) 
             }
 
-           MatchExpr(es(0), newcases)
+           matchExpr(es(0), newcases)
            }))
       case Passes(scrut, tests) =>
         Some((scrut +: tests.flatMap{ case SimpleCase(_, e) => Seq(e)

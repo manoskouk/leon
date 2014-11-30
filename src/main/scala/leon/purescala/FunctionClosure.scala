@@ -9,6 +9,7 @@ import Trees._
 import Extractors._
 import TreeOps._
 import TypeTrees._
+import Constructors._
 
 object FunctionClosure extends TransformationPhase {
 
@@ -162,7 +163,7 @@ object FunctionClosure extends TransformationPhase {
         }
       }
       val tpe = csesRec.head.rhs.getType
-      MatchExpr(scrutRec, csesRec).copiedFrom(m)
+      matchExpr(scrutRec, csesRec).copiedFrom(m)
     }
     case v @ Variable(id) => id2freshId.get(id) match {
       case None => v

@@ -9,6 +9,7 @@ import purescala.Common._
 import purescala.TypeTrees._
 import purescala.TreeOps._
 import purescala.Extractors._
+import purescala.Constructors._
 import purescala.Definitions._
 import solvers._
 
@@ -75,7 +76,7 @@ case object ADTSplit extends Rule("ADT Split.") {
               SimpleCase(pattern, sol.term)
             }
 
-            Some(Solution(Or(globalPre), sols.flatMap(_.defs).toSet, MatchExpr(Variable(id), cases)))
+            Some(Solution(Or(globalPre), sols.flatMap(_.defs).toSet, matchExpr(Variable(id), cases)))
         }
 
         Some(RuleInstantiation.immediateDecomp(p, this, subInfo.map(_._2).toList, onSuccess, "ADT Split on '"+id+"'"))

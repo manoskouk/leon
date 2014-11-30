@@ -37,7 +37,7 @@ trait StructuralSize {
           val fd = new FunDef(FreshIdentifier("size", true), formalTParams, Int32Type, Seq(argument), DefType.MethodDef)
           sizeCache(argumentType) = fd
 
-          val body = simplifyLets(matchToIfThenElse(MatchExpr(argument.toVariable, cases(argumentType))))
+          val body = simplifyLets(matchToIfThenElse(matchExpr(argument.toVariable, cases(argumentType))))
           val postId = FreshIdentifier("res", false).setType(Int32Type)
           val postcondition = GreaterThan(Variable(postId), IntLiteral(0))
 

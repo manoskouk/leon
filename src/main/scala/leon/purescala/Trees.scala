@@ -124,36 +124,12 @@ object Trees {
     }
   }
 
-  object MatchExpr {
-    def apply(scrutinee: Expr, cases: Seq[MatchCase]) : MatchExpr = {
-      scrutinee.getType match {
-        case a: AbstractClassType => new MatchExpr(scrutinee, cases)
-        case c: CaseClassType => new MatchExpr(scrutinee, cases.filter(_.pattern match {
-          case CaseClassPattern(_, cct, _) if cct.classDef != c.classDef => false
-          case _ => true
-        }))
-        case _: TupleType | Int32Type | BooleanType | UnitType => new MatchExpr(scrutinee, cases)
-        
-        case t => scala.sys.error("Constructing match expression on non-supported type: "+t)
-      }
-    }
-
-    def unapply(me: MatchExpr) : Option[(Expr,Seq[MatchCase])] = if (me == null) None else Some((me.scrutinee, me.cases))
-  }
-
-  class MatchExpr(val scrutinee: Expr, val cases: Seq[MatchCase]) extends Expr {
+  case class MatchExpr(scrutinee: Expr, cases: Seq[MatchCase]) extends Expr {
     assert(cases.nonEmpty)
 
     def getType = leastUpperBound(cases.map(_.rhs.getType)).getOrElse(Untyped)
 
     def scrutineeClassType: ClassType = scrutinee.getType.asInstanceOf[ClassType]
-
-    override def equals(that: Any): Boolean = (that != null) && (that match {
-      case t: MatchExpr => t.scrutinee == scrutinee && t.cases == cases
-      case _ => false
-    })
-
-    override def hashCode: Int = scrutinee.hashCode + cases.hashCode + 2
   }
 
   sealed abstract class MatchCase extends Tree {

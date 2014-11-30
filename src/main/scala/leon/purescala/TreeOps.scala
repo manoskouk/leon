@@ -426,7 +426,7 @@ object TreeOps {
 
     postMap({
       case m @ MatchExpr(s, cses) =>
-        Some(MatchExpr(s, cses.map(freshenCase(_))).copiedFrom(m))
+        Some(matchExpr(s, cses.map(freshenCase(_))).copiedFrom(m))
 
       case l @ Let(i,e,b) =>
         val newID = FreshIdentifier(i.name, true).copiedFrom(i)
@@ -606,7 +606,7 @@ object TreeOps {
       case v @ Variable(id) if s.isDefinedAt(id) => rec(s(id), s)
       case l @ Let(i,e,b) => rec(b, s + (i -> rec(e, s)))
       case i @ IfExpr(t1,t2,t3) => IfExpr(rec(t1, s),rec(t2, s),rec(t3, s))
-      case m @ MatchExpr(scrut,cses) => MatchExpr(rec(scrut, s), cses.map(inCase(_, s))).setPos(m)
+      case m @ MatchExpr(scrut,cses) => matchExpr(rec(scrut, s), cses.map(inCase(_, s))).setPos(m)
       case n @ NAryOperator(args, recons) => {
         var change = false
         val rargs = args.map(a => {
@@ -2199,10 +2199,10 @@ object TreeOps {
               Seq(c)
           }}
 
-          var finalMatch = MatchExpr(scrutinee, List(newCases.head))
+          var finalMatch = matchExpr(scrutinee, List(newCases.head))
 
           for (toAdd <- newCases.tail if !isMatchExhaustive(finalMatch)) {
-            finalMatch = MatchExpr(scrutinee, finalMatch.cases :+ toAdd)
+            finalMatch = matchExpr(scrutinee, finalMatch.cases :+ toAdd)
           }
 
           finalMatch

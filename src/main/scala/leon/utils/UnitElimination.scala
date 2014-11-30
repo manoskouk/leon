@@ -147,7 +147,7 @@ object UnitElimination extends TransformationPhase {
           case GuardedCase(pat, guard, rhs) => GuardedCase(pat, removeUnit(guard), removeUnit(rhs))
         }
         val tpe = csesRec.head.rhs.getType
-        MatchExpr(scrutRec, csesRec).setPos(m)
+        matchExpr(scrutRec, csesRec).setPos(m)
       }
       case _ => sys.error("not supported: " + expr)
     }

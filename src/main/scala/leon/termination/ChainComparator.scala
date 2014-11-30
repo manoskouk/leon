@@ -8,6 +8,7 @@ import purescala.TreeOps._
 import purescala.TypeTrees._
 import purescala.TypeTreeOps._
 import purescala.Definitions._
+import purescala.Constructors._
 import purescala.Common._
 
 trait ChainComparator { self : StructuralSize with TerminationChecker =>
@@ -37,7 +38,7 @@ trait ChainComparator { self : StructuralSize with TerminationChecker =>
         })
       case TupleType(tpes) =>
         powerSetToFunSet((0 until tpes.length).flatMap { case index =>
-          rec(tpes(index)).map(recons => (e: Expr) => recons(TupleSelect(e, index + 1)))
+          rec(tpes(index)).map(recons => (e: Expr) => recons(tupleSelect(e, index + 1)))
         })
       case _ => Set((e: Expr) => e)
     }
@@ -53,7 +54,7 @@ trait ChainComparator { self : StructuralSize with TerminationChecker =>
         }.toSet
       case TupleType(tpes) =>
         (0 until tpes.length).flatMap { case index =>
-          rec(tpes(index)).map(recons => (e: Expr) => recons(TupleSelect(e, index + 1)))
+          rec(tpes(index)).map(recons => (e: Expr) => recons(tupleSelect(e, index + 1)))
         }.toSet
       case _ => Set((e: Expr) => e)
     }
@@ -78,9 +79,9 @@ trait ChainComparator { self : StructuralSize with TerminationChecker =>
       })
     })
     case TupleType(types1) => Or((0 until types1.length) map { case index =>
-      structuralDecreasing(TupleSelect(e1, index + 1), e2s.map { case (path, e2) =>
+      structuralDecreasing(tupleSelect(e1, index + 1), e2s.map { case (path, e2) =>
         e2.getType match {
-          case TupleType(_) => (path, TupleSelect(e2, index + 1))
+          case TupleType(_) => (path, tupleSelect(e2, index + 1))
           case _ => scala.sys.error("Unexpected input combination: " + e1 + " " + e2)
         }
       })

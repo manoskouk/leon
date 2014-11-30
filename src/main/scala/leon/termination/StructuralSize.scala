@@ -7,6 +7,7 @@ import purescala.Trees._
 import purescala.TreeOps._
 import purescala.TypeTrees._
 import purescala.Definitions._
+import purescala.Constructors._
 import purescala.Common._
 
 import scala.collection.mutable.{Map => MutableMap}
@@ -63,7 +64,7 @@ trait StructuralSize {
         })
         FunctionInvocation(TypedFunDef(fd, ct.tps), Seq(expr))
       case TupleType(argTypes) => argTypes.zipWithIndex.map({
-        case (_, index) => size(TupleSelect(expr, index + 1))
+        case (_, index) => size(tupleSelect(expr, index + 1))
       }).foldLeft[Expr](IntLiteral(0))(Plus(_,_))
       case _ => IntLiteral(0)
     }

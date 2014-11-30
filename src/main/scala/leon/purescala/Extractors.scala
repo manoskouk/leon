@@ -11,6 +11,7 @@ object Extractors {
   import TypeTreeOps._
   import Definitions._
   import Extractors._
+  import Constructors._
   import TreeOps._
 
   object UnaryOperator {
@@ -24,7 +25,7 @@ object Extractors {
       case SetMax(s) => Some((s,SetMax))
       case CaseClassSelector(cd, e, sel) => Some((e, CaseClassSelector(cd, _, sel)))
       case CaseClassInstanceOf(cd, e) => Some((e, CaseClassInstanceOf(cd, _)))
-      case TupleSelect(t, i) => Some((t, TupleSelect(_, i)))
+      case TupleSelect(t, i) => Some((t, tupleSelect(_, i)))
       case ArrayLength(a) => Some((a, ArrayLength))
       case ArrayClone(a) => Some((a, ArrayClone))
       case ArrayMake(t) => Some((t, ArrayMake))

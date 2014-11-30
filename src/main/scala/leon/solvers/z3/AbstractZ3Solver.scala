@@ -9,6 +9,7 @@ import z3.scala._
 import solvers._
 import purescala.Common._
 import purescala.Definitions._
+import purescala.Constructors._
 import purescala.Trees._
 import purescala.TypeTreeOps._
 import xlang.Trees._
@@ -515,7 +516,7 @@ trait AbstractZ3Solver
       case LetTuple(ids, e, b) => {
         var ix = 1
         z3Vars = z3Vars ++ ids.map((id) => {
-          val entry = (id -> rec(TupleSelect(e,ix)))
+          val entry = (id -> rec(tupleSelect(e, ix)))
           ix += 1
           entry
         })

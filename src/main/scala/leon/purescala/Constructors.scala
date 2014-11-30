@@ -8,6 +8,7 @@ import utils._
 object Constructors {
   import Trees._
   import Common._
+  import TypeTrees._
 
   def tupleSelect(t: Expr, index: Int) = t match {
     case Tuple(es) =>
@@ -37,5 +38,23 @@ object Constructors {
     Tuple(es)
   } else {
     es.head
+  }
+
+  def matchExpr(scrutinee: Expr, cases: Seq[MatchCase]): MatchExpr = {
+    scrutinee.getType match {
+      case c: CaseClassType =>
+        new MatchExpr(scrutinee,
+          cases.filter(_.pattern match {
+            case CaseClassPattern(_, cct, _) if cct.classDef != c.classDef => false
+            case _ => true
+          })
+        )
+
+      case _: TupleType | Int32Type | BooleanType | UnitType | _: AbstractClassType =>
+        new MatchExpr(scrutinee, cases)
+
+      case t =>
+        scala.sys.error("Constructing match expression on non-supported type: "+t)
+    }
   }
 }

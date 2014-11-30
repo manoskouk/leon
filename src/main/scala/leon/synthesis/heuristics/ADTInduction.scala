@@ -8,6 +8,7 @@ import solvers._
 import purescala.Common._
 import purescala.Trees._
 import purescala.Extractors._
+import purescala.Constructors._
 import purescala.TreeOps._
 import purescala.TypeTrees._
 import purescala.Definitions._
@@ -101,7 +102,7 @@ case object ADTInduction extends Rule("ADT Induction") with Heuristic {
               newFun.precondition = Some(funPre)
               newFun.postcondition = Some((idPost, LetTuple(p.xs.toSeq, Variable(idPost), funPost)))
 
-              newFun.body = Some(MatchExpr(Variable(inductOn), cases))
+              newFun.body = Some(matchExpr(Variable(inductOn), cases))
 
               Some(Solution(Or(globalPre), 
                             sols.flatMap(_.defs).toSet+newFun,

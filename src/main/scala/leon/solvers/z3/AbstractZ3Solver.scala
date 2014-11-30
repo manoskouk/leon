@@ -524,8 +524,7 @@ trait AbstractZ3Solver
         rb
       }
       case Waypoint(_, e) => rec(e)
-      case e @ Error(_) => {
-        val tpe = e.getType
+      case e @ Error(tpe, _) => {
         val newAST = z3.mkFreshConst("errorValue", typeToSort(tpe))
         // Might introduce dupplicates (e), but no worries here
         variables += (e -> newAST)

@@ -200,7 +200,7 @@ abstract class CEGISLike[T <% Typed](name: String) extends Rule(name) {
             // We compute the IF expression corresponding to each c
             val ifExpr = if (cases.isEmpty) {
               // This can happen with ADTs with only cases with arguments
-              Error("No valid clause available").setType(c.getType)
+              Error(c.getType, "No valid clause available")
             } else {
               cases.tail.foldLeft(cases.head._2) {
                 case (elze, (b, thenn)) => IfExpr(Variable(b), thenn, elze)
@@ -224,7 +224,7 @@ abstract class CEGISLike[T <% Typed](name: String) extends Rule(name) {
             case Some(value) =>
               res = Let(c, cToExprs(c), res)
             case None =>
-              res = Let(c, Error("No value available").setType(c.getType), res)
+              res = Let(c, Error(c.getType, "No value available"), res)
           }
 
           for (dep <- cChildren(c) if !unreachableCs(dep)) {

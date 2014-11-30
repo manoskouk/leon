@@ -24,7 +24,7 @@ case object Ground extends Rule("Ground") {
               val sol = Solution(BooleanLiteral(true), Set(), Tuple(p.xs.map(valuateWithModel(model))))
               RuleClosed(sol)
             case (Some(false), model) =>
-              val sol = Solution(BooleanLiteral(false), Set(), Error(p.phi+" is UNSAT!").setType(tpe))
+              val sol = Solution(BooleanLiteral(false), Set(), Error(tpe, p.phi+" is UNSAT!"))
               RuleClosed(sol)
             case _ =>
               RuleFailed()

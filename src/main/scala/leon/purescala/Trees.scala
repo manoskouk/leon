@@ -110,25 +110,9 @@ object Trees {
     def getType = TupleType(exprs.map(_.getType))
   }
 
-  // TODO: ship this simplification to constructors
-  object TupleSelect {
-    def apply(tuple: Expr, index: Int): Expr = {
-      tuple match {
-        case Tuple(exprs) => exprs(index-1) // indexes as 1-based
-        case _ => new TupleSelect(tuple, index)
-      }
-    }
-
-    def unapply(e: TupleSelect): Option[(Expr, Int)] = {
-      if (e eq null) None else Some((e.tuple, e.index))
-    }
-  }
-
-  // This must be 1-indexed ! (So are methods of Scala Tuples)
-  class TupleSelect(val tuple: Expr, val index: Int) extends Expr {
+  // Index is 1-based, first element of tuple is 1.
+  case class TupleSelect(tuple: Expr, index: Int) extends Expr {
     assert(index >= 1)
-
-    assert(tuple.getType.isInstanceOf[TupleType], "Applying TupleSelect on a non-tuple tree [%s] of type [%s].".format(tuple, tuple.getType))
 
     def getType = tuple.getType match {
       case TupleType(ts) =>
@@ -138,13 +122,6 @@ object Trees {
       case _ =>
         Untyped
     }
-
-    override def equals(that: Any): Boolean = (that != null) && (that match {
-      case t: TupleSelect => t.tuple == tuple && t.index == index
-      case _ => false
-    })
-
-    override def hashCode: Int = tuple.hashCode + index.hashCode + 1
   }
 
   object MatchExpr {

@@ -7,6 +7,7 @@ import purescala.Common._
 import purescala.Definitions.{Program, FunDef, ModuleDef, DefType}
 import purescala.TreeOps._
 import purescala.Trees._
+import purescala.Constructors._
 import purescala.ScalaPrinter
 
 import solvers._

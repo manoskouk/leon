@@ -21,6 +21,7 @@ import purescala.Trees.{Expr => LeonExpr, This => LeonThis, _}
 import purescala.TypeTrees.{TypeTree => LeonType, _}
 import purescala.Common._
 import purescala.Extractors.IsTyped
+import purescala.Constructors._
 import purescala.TreeOps._
 import purescala.TypeTreeOps._
 import purescala.DefOps.{inPackage, inUnit}
@@ -1033,7 +1034,7 @@ trait CodeExtraction extends ASTExtractors {
 
           tupleExpr.getType match {
             case TupleType(tpes) if tpes.size >= index =>
-              TupleSelect(tupleExpr, index)
+              tupleSelect(tupleExpr, index)
 
             case _ =>
               outOfSubsetError(current, "Invalid tupple access")

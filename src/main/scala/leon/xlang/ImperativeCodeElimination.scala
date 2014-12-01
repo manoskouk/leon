@@ -190,7 +190,7 @@ object ImperativeCodeElimination extends LeonPhase[Program, (Program, Set[FunDef
           val invariantPostcondition: Option[Expr] = wh.invariant.map(expr => replace(modifiedVars2ResultVars, expr))
           whileFunDef.precondition = invariantPrecondition
           whileFunDef.postcondition = trivialPostcondition.map(expr => 
-              (resVar.id, And(expr, invariantPostcondition match { 
+              (resVar.id, and(expr, invariantPostcondition match { 
                 case Some(e) => e
                 case None => BooleanLiteral(true)
               })))

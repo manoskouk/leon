@@ -53,7 +53,7 @@ abstract class TransformerWithPC extends Transformer {
 
     case And(es) =>
       var soFar = path
-      And(for(e <- es) yield {
+      andJoin(for(e <- es) yield {
         val se = rec(e, soFar)
         soFar = register(se, soFar)
         se
@@ -61,7 +61,7 @@ abstract class TransformerWithPC extends Transformer {
 
     case Or(es) =>
       var soFar = path
-      Or(for(e <- es) yield {
+      orJoin(for(e <- es) yield {
         val se = rec(e, soFar)
         soFar = register(Not(se), soFar)
         se

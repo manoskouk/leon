@@ -112,7 +112,7 @@ class Synthesizer(val context : LeonContext,
       }.toMap
 
     val fd = new FunDef(FreshIdentifier(functionContext.id.name+"_final", true), Nil, ret, problem.as.map(id => ValDef(id, id.getType)), DefType.MethodDef)
-    fd.precondition  = Some(And(problem.pc, sol.pre))
+    fd.precondition  = Some(and(problem.pc, sol.pre))
     fd.postcondition = Some((res.id, replace(mapPost, problem.phi)))
     fd.body          = Some(sol.term)
 

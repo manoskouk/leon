@@ -78,7 +78,7 @@ object FunctionClosure extends TransformationPhase {
       }
 
 
-      val newPrecondition = simplifyLets(introduceLets(And((capturedConstraints ++ fd.precondition).toSeq), fd2FreshFd))
+      val newPrecondition = simplifyLets(introduceLets(and((capturedConstraints ++ fd.precondition).toSeq :_*), fd2FreshFd))
       newFunDef.precondition = if(newPrecondition == BooleanLiteral(true)) None else Some(newPrecondition)
 
       val freshPostcondition = fd.postcondition.map{ case (id, post) => (id, introduceLets(post, fd2FreshFd)) }

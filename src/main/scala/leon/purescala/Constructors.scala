@@ -57,4 +57,61 @@ object Constructors {
         scala.sys.error("Constructing match expression on non-supported type: "+t)
     }
   }
+
+  def and(exprs: Expr*): Expr = {
+    val flat = exprs.flatMap(_ match {
+      case And(es) => es
+      case o => Seq(o)
+    })
+
+    var stop = false
+    val simpler = for(e <- flat if !stop && e != BooleanLiteral(true)) yield {
+      if(e == BooleanLiteral(false)) stop = true
+      e
+    }
+
+    simpler match {
+      case Seq()  => BooleanLiteral(true)
+      case Seq(x) => x
+      case _      => And(simpler)
+    }
+  }
+
+  def andJoin(es: Seq[Expr]) = and(es :_*)
+
+  def or(exprs: Expr*): Expr = {
+    val flat = exprs.flatMap(_ match {
+      case Or(es) => es
+      case o => Seq(o)
+    })
+
+    var stop = false
+    val simpler = for(e <- flat if !stop && e != BooleanLiteral(false)) yield {
+      if(e == BooleanLiteral(true)) stop = true
+      e
+    }
+
+    simpler match {
+      case Seq()  => BooleanLiteral(false)
+      case Seq(x) => x
+      case _      => Or(simpler)
+    }
+  }
+
+  def orJoin(es: Seq[Expr]) = or(es :_*)
+
+  def not(e: Expr): Expr = e match {
+    case Not(e)            => e
+    case BooleanLiteral(v) => BooleanLiteral(!v)
+    case _                 => Not(e)
+  }
+
+  def implies(lhs: Expr, rhs: Expr): Expr = (lhs, rhs) match {
+    case (BooleanLiteral(false), _) => BooleanLiteral(true)
+    case (_, BooleanLiteral(true))  => BooleanLiteral(true)
+    case (BooleanLiteral(true), r)  => r
+    case (l, BooleanLiteral(false)) => Not(l)
+    case (l1, Implies(l2, r2))      => implies(and(l1, l2), r2)
+    case _                          => Implies(lhs, rhs)
+  }
 }

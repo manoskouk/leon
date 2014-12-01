@@ -63,8 +63,8 @@ trait ChainComparator { self : StructuralSize with TerminationChecker =>
   }
 
   def structuralDecreasing(e1: Expr, e2s: Seq[(Seq[Expr], Expr)]) : Seq[Expr] = flatTypesPowerset(e1.getType).toSeq.map {
-    recons => And(e2s.map { case (path, e2) =>
-      Implies(And(path), GreaterThan(self.size(recons(e1)), self.size(recons(e2))))
+    recons => andJoin(e2s.map { case (path, e2) =>
+      implies(andJoin(path), GreaterThan(self.size(recons(e1)), self.size(recons(e2))))
     })
   }
 
@@ -196,13 +196,13 @@ trait ChainComparator { self : StructuralSize with TerminationChecker =>
         val endpoint = numericEndpoint(e, cluster)
 
         val uppers = if (endpoint == UpperBoundEndpoint || endpoint == AnyEndpoint) {
-          Some(And(e2s map { case (path, e2) => Implies(And(path), GreaterThan(e, recons(e2))) }))
+          Some(andJoin(e2s map { case (path, e2) => implies(andJoin(path), GreaterThan(e, recons(e2))) }))
         } else {
           None
         }
 
         val lowers = if (endpoint == LowerBoundEndpoint || endpoint == AnyEndpoint) {
-          Some(And(e2s map { case (path, e2) => Implies(And(path), LessThan(e, recons(e2))) }))
+          Some(And(e2s map { case (path, e2) => implies(andJoin(path), LessThan(e, recons(e2))) }))
         } else {
           None
         }

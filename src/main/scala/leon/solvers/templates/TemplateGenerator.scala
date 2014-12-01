@@ -11,6 +11,7 @@ import purescala.Extractors._
 import purescala.TreeOps._
 import purescala.TypeTrees._
 import purescala.Definitions._
+import purescala.Constructors._
 
 import evaluators._
 
@@ -123,13 +124,13 @@ class TemplateGenerator[T](val encoder: TemplateEncoder[T]) {
         case m : MatchExpr => sys.error("MatchExpr's should have been eliminated.")
 
         case i @ Implies(lhs, rhs) =>
-          Implies(rec(pathVar, lhs), rec(pathVar, rhs))
+          implies(rec(pathVar, lhs), rec(pathVar, rhs))
 
         case a @ And(parts) =>
-          And(parts.map(rec(pathVar, _)))
+          andJoin(parts.map(rec(pathVar, _)))
 
         case o @ Or(parts) =>
-          Or(parts.map(rec(pathVar, _)))
+          orJoin(parts.map(rec(pathVar, _)))
 
         case i @ IfExpr(cond, thenn, elze) => {
           if(!requireDecomposition(i)) {
@@ -148,11 +149,11 @@ class TemplateGenerator[T](val encoder: TemplateEncoder[T]) {
             val trec = rec(newBool1, thenn)
             val erec = rec(newBool2, elze)
 
-            storeGuarded(pathVar, Or(Variable(newBool1), Variable(newBool2)))
-            storeGuarded(pathVar, Or(Not(Variable(newBool1)), Not(Variable(newBool2))))
+            storeGuarded(pathVar, or(Variable(newBool1), Variable(newBool2)))
+            storeGuarded(pathVar, or(not(Variable(newBool1)), not(Variable(newBool2))))
             // TODO can we improve this? i.e. make it more symmetrical?
             // Probably it's symmetrical enough to Z3.
-            storeGuarded(pathVar, Iff(Variable(newBool1), crec)) 
+            storeGuarded(pathVar, Equals(Variable(newBool1), crec))
             storeGuarded(newBool1, Equals(Variable(newExpr), trec))
             storeGuarded(newBool2, Equals(Variable(newExpr), erec))
             Variable(newExpr)
@@ -196,7 +197,7 @@ class TemplateGenerator[T](val encoder: TemplateEncoder[T]) {
         val b : Expr = Equals(invocation, body)
 
         Some(if(prec.isDefined) {
-          Implies(prec.get, b)
+          implies(prec.get, b)
         } else {
           b
         })
@@ -222,7 +223,7 @@ class TemplateGenerator[T](val encoder: TemplateEncoder[T]) {
 
         val postHolds : Expr =
           if(tfd.hasPrecondition) {
-            Implies(prec.get, newPost)
+            implies(prec.get, newPost)
           } else {
             newPost
           }

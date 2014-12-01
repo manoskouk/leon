@@ -41,8 +41,7 @@ object Extractors {
   object BinaryOperator {
     def unapply(expr: Expr) : Option[(Expr,Expr,(Expr,Expr)=>Expr)] = expr match {
       case Equals(t1,t2) => Some((t1,t2,Equals.apply))
-      case Iff(t1,t2) => Some((t1,t2,Iff(_,_)))
-      case Implies(t1,t2) => Some((t1,t2,Implies.apply))
+      case Implies(t1,t2) => Some((t1,t2, implies))
       case Plus(t1,t2) => Some((t1,t2,Plus))
       case Minus(t1,t2) => Some((t1,t2,Minus))
       case Times(t1,t2) => Some((t1,t2,Times))
@@ -87,8 +86,8 @@ object Extractors {
       case fi @ FunctionInvocation(fd, args) => Some((args, (as => FunctionInvocation(fd, as).setPos(fi))))
       case mi @ MethodInvocation(rec, cd, tfd, args) => Some((rec +: args, (as => MethodInvocation(as.head, cd, tfd, as.tail).setPos(mi))))
       case CaseClass(cd, args) => Some((args, CaseClass(cd, _)))
-      case And(args) => Some((args, And.apply))
-      case Or(args) => Some((args, Or.apply))
+      case And(args) => Some((args, and))
+      case Or(args) => Some((args, or))
       case FiniteSet(args) =>
         Some((args.toSeq,
               { newargs =>
@@ -234,6 +233,20 @@ object Extractors {
 
   object IsTyped {
     def unapply[T <: Typed](e: T): Option[(T, TypeTree)] = Some((e, e.getType))
+  }
+
+  object Pattern {
+    def unapply(p : Pattern) : Option[(
+      Option[Identifier], 
+      Seq[Pattern], 
+      (Option[Identifier], Seq[Pattern]) => Pattern
+    )] = Some(p match {
+      case InstanceOfPattern(b, ct)       => (b, Seq(), (b, _)  => InstanceOfPattern(b,ct))
+      case WildcardPattern(b)             => (b, Seq(), (b, _)  => WildcardPattern(b))
+      case CaseClassPattern(b, ct, subs)  => (b, subs,  (b, sp) => CaseClassPattern(b, ct, sp))
+      case TuplePattern(b,subs)           => (b, subs,  (b, sp) => TuplePattern(b, sp))
+      case LiteralPattern(b, l)           => (b, Seq(), (b, _)  => LiteralPattern(b, l))
+    })
   }
 
 }

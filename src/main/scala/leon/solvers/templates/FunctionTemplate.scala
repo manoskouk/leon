@@ -11,6 +11,7 @@ import purescala.Extractors._
 import purescala.TreeOps._
 import purescala.TypeTrees._
 import purescala.Definitions._
+import purescala.Constructors._
 
 import evaluators._
 
@@ -27,7 +28,7 @@ class FunctionTemplate[T](
 
   val clauses: Seq[Expr] = {
     (for((b,es) <- guardedExprs; e <- es) yield {
-      Implies(Variable(b), e)
+      implies(Variable(b), e)
     }).toSeq
   }
 

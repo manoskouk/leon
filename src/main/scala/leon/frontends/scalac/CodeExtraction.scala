@@ -1274,12 +1274,6 @@ trait CodeExtraction extends ASTExtractors {
           val rr = extractTree(r)
 
           (rl.getType, rr.getType) match {
-            case (SetType(_), SetType(_)) =>
-              SetEquals(rl, rr)
-
-            case (BooleanType, BooleanType) =>
-              Iff(rl, rr)
-
             case (rt, lt) if isSubtypeOf(rt, lt) || isSubtypeOf(lt, rt) =>
               Equals(rl, rr)
 
@@ -1489,10 +1483,10 @@ trait CodeExtraction extends ASTExtractors {
 
             // Boolean methods
             case (IsTyped(a1, BooleanType), "&&", List(IsTyped(a2, BooleanType))) =>
-              And(a1, a2)
+              and(a1, a2)
 
             case (IsTyped(a1, BooleanType), "||", List(IsTyped(a2, BooleanType))) =>
-              Or(a1, a2)
+              or(a1, a2)
 
             // Set methods
             case (IsTyped(a1, SetType(b1)), "min", Nil) =>

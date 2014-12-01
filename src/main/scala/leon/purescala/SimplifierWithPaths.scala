@@ -20,7 +20,7 @@ class SimplifierWithPaths(sf: SolverFactory[Solver]) extends TransformerWithPC {
   protected def register(e: Expr, c: C) = e :: c
 
   def impliedBy(e : Expr, path : Seq[Expr]) : Boolean = try {
-    solver.solveVALID(Implies(And(path), e)) match {
+    solver.solveVALID(implies(andJoin(path), e)) match {
       case Some(true) => true
       case _ => false
     }
@@ -29,7 +29,7 @@ class SimplifierWithPaths(sf: SolverFactory[Solver]) extends TransformerWithPC {
   }
 
   def contradictedBy(e : Expr, path : Seq[Expr]) : Boolean = try {
-    solver.solveVALID(Implies(And(path), Not(e))) match {
+    solver.solveVALID(implies(andJoin(path), Not(e))) match {
       case Some(true) => true
       case _ => false
     }
@@ -66,7 +66,7 @@ class SimplifierWithPaths(sf: SolverFactory[Solver]) extends TransformerWithPC {
     case And(es) =>
       var soFar = path
       var continue = true
-      var r = And(for(e <- es if continue) yield {
+      var r = andJoin(for(e <- es if continue) yield {
         val se = rec(e, soFar)
         if(se == BooleanLiteral(false)) continue = false
         soFar = register(se, soFar)
@@ -88,9 +88,9 @@ class SimplifierWithPaths(sf: SolverFactory[Solver]) extends TransformerWithPC {
       val conds = matchCasePathConditions(me, path)
 
       val newCases = cases.zip(conds).flatMap { case (cs, cond) =>
-       if (stillPossible && sat(And(cond))) {
+       if (stillPossible && sat(and(cond: _*))) {
 
-          if (valid(And(cond))) {
+          if (valid(and(cond: _*))) {
             stillPossible = false
           }
 
@@ -123,7 +123,7 @@ class SimplifierWithPaths(sf: SolverFactory[Solver]) extends TransformerWithPC {
     case Or(es) =>
       var soFar = path
       var continue = true
-      var r = Or(for(e <- es if continue) yield {
+      var r = orJoin(for(e <- es if continue) yield {
         val se = rec(e, soFar)
         if(se == BooleanLiteral(true)) continue = false
         soFar = register(Not(se), soFar)

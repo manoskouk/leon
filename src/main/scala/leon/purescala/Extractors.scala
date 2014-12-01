@@ -28,7 +28,6 @@ object Extractors {
       case TupleSelect(t, i) => Some((t, tupleSelect(_, i)))
       case ArrayLength(a) => Some((a, ArrayLength))
       case ArrayClone(a) => Some((a, ArrayClone))
-      case ArrayMake(t) => Some((t, ArrayMake))
       case (ue: UnaryExtractable) => ue.extract
       case _ => None
     }

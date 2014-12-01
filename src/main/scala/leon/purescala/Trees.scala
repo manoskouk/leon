@@ -359,15 +359,6 @@ object Trees {
   }
 
   /* Array operations */
-  @deprecated("Unsupported Array operation with most solvers", "Leon 2.3")
-  case class ArrayFill(length: Expr, defaultValue: Expr) extends Expr {
-    def getType = ArrayType(defaultValue.getType)
-  }
-
-  @deprecated("Unsupported Array operation with most solvers", "Leon 2.3")
-  case class ArrayMake(defaultValue: Expr) extends Expr {
-    def getType = ArrayType(defaultValue.getType)
-  }
 
   case class ArraySelect(array: Expr, index: Expr) extends Expr {
     def getType = array.getType match {
@@ -424,7 +415,12 @@ object Trees {
 
   /**
    * DEPRECATED TREES
+   * These trees are not guaranteed to be supported by Leon.
    **/
+  case class ArrayFill(length: Expr, defaultValue: Expr) extends Expr {
+    def getType = ArrayType(defaultValue.getType)
+  }
+
   case class ArrayClone(array: Expr) extends Expr {
     def getType = array.getType
   }

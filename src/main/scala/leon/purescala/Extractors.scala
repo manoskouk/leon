@@ -27,7 +27,6 @@ object Extractors {
       case CaseClassInstanceOf(cd, e) => Some((e, CaseClassInstanceOf(cd, _)))
       case TupleSelect(t, i) => Some((t, tupleSelect(_, i)))
       case ArrayLength(a) => Some((a, ArrayLength))
-      case ArrayClone(a) => Some((a, ArrayClone))
       case (ue: UnaryExtractable) => ue.extract
       case _ => None
     }

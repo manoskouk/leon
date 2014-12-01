@@ -123,7 +123,6 @@ object Extractors {
           val tpe = leastUpperBound(as.map(_.getType)).map(ArrayType(_)).getOrElse(expr.getType)
           FiniteArray(as).setType(tpe)
         }))
-      case Distinct(args) => Some((args, Distinct))
       case Tuple(args) => Some((args, Tuple))
       case IfExpr(cond, thenn, elze) => Some((Seq(cond, thenn, elze), (as: Seq[Expr]) => IfExpr(as(0), as(1), as(2))))
       case MatchExpr(scrut, cases) =>

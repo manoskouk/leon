@@ -342,49 +342,6 @@ object Trees {
     def getType = leastUpperBound(Seq(set1, set2).map(_.getType)).getOrElse(Untyped)
   }
 
-  @deprecated("SetMin is not supported by any solver", "2.3")
-  case class SetMin(set: Expr) extends Expr {
-    val getType = Int32Type
-  }
-
-  @deprecated("SetMax is not supported by any solver", "2.3")
-  case class SetMax(set: Expr) extends Expr {
-    val getType = Int32Type
-  }
-
-  /* Multiset expressions  !!! UNSUPPORTED / DEPRECATED !!! */
-  case class EmptyMultiset(baseType: TypeTree) extends Expr with Terminal {
-    val getType = MultisetType(baseType)
-  }
-  case class FiniteMultiset(elements: Seq[Expr]) extends Expr {
-    assert(elements.size > 0)
-    def getType = MultisetType(leastUpperBound(elements.map(_.getType)).getOrElse(Untyped))
-  }
-  case class Multiplicity(element: Expr, multiset: Expr) extends Expr {
-    val getType = Int32Type
-  }
-  case class MultisetCardinality(multiset: Expr) extends Expr {
-    val getType = Int32Type
-  }
-  case class MultisetIntersection(multiset1: Expr, multiset2: Expr) extends Expr {
-    def getType = leastUpperBound(Seq(multiset1, multiset2).map(_.getType)).getOrElse(Untyped)
-  }
-  case class MultisetUnion(multiset1: Expr, multiset2: Expr) extends Expr  {
-    def getType = leastUpperBound(Seq(multiset1, multiset2).map(_.getType)).getOrElse(Untyped)
-  }
-  case class MultisetPlus(multiset1: Expr, multiset2: Expr) extends Expr { // disjoint union 
-    def getType = leastUpperBound(Seq(multiset1, multiset2).map(_.getType)).getOrElse(Untyped)
-  }
-  case class MultisetDifference(multiset1: Expr, multiset2: Expr) extends Expr  {
-    def getType = leastUpperBound(Seq(multiset1, multiset2).map(_.getType)).getOrElse(Untyped)
-  }
-  case class MultisetToSet(multiset: Expr) extends Expr {
-    def getType = multiset.getType match {
-      case MultisetType(base) => SetType(base)
-      case _ => Untyped
-    }
-  }
-
   /* Map operations. */
   case class FiniteMap(singletons: Seq[(Expr, Expr)]) extends Expr with MutableTyped
   case class MapGet(map: Expr, key: Expr) extends Expr {
@@ -436,15 +393,6 @@ object Trees {
 
   case class FiniteArray(exprs: Seq[Expr]) extends Expr with MutableTyped
 
-  @deprecated("Unsupported Array operation with most solvers", "Leon 2.3")
-  case class ArrayClone(array: Expr) extends Expr {
-    def getType = array.getType
-  }
-
-  case class Distinct(exprs: Seq[Expr]) extends Expr {
-    val getType = BooleanType
-  }
-
   /* Special trees */
 
   // Provide an oracle (synthesizable, all-seeing choose)
@@ -474,6 +422,52 @@ object Trees {
     }
   }
 
+  /**
+   * DEPRECATED TREES
+   **/
+  case class ArrayClone(array: Expr) extends Expr {
+    def getType = array.getType
+  }
+
+  case class SetMin(set: Expr) extends Expr {
+    val getType = Int32Type
+  }
+
+  case class SetMax(set: Expr) extends Expr {
+    val getType = Int32Type
+  }
+
+  case class EmptyMultiset(baseType: TypeTree) extends Expr with Terminal {
+    val getType = MultisetType(baseType)
+  }
+  case class FiniteMultiset(elements: Seq[Expr]) extends Expr {
+    assert(elements.size > 0)
+    def getType = MultisetType(leastUpperBound(elements.map(_.getType)).getOrElse(Untyped))
+  }
+  case class Multiplicity(element: Expr, multiset: Expr) extends Expr {
+    val getType = Int32Type
+  }
+  case class MultisetCardinality(multiset: Expr) extends Expr {
+    val getType = Int32Type
+  }
+  case class MultisetIntersection(multiset1: Expr, multiset2: Expr) extends Expr {
+    def getType = leastUpperBound(Seq(multiset1, multiset2).map(_.getType)).getOrElse(Untyped)
+  }
+  case class MultisetUnion(multiset1: Expr, multiset2: Expr) extends Expr  {
+    def getType = leastUpperBound(Seq(multiset1, multiset2).map(_.getType)).getOrElse(Untyped)
+  }
+  case class MultisetPlus(multiset1: Expr, multiset2: Expr) extends Expr { // disjoint union 
+    def getType = leastUpperBound(Seq(multiset1, multiset2).map(_.getType)).getOrElse(Untyped)
+  }
+  case class MultisetDifference(multiset1: Expr, multiset2: Expr) extends Expr  {
+    def getType = leastUpperBound(Seq(multiset1, multiset2).map(_.getType)).getOrElse(Untyped)
+  }
+  case class MultisetToSet(multiset: Expr) extends Expr {
+    def getType = multiset.getType match {
+      case MultisetType(base) => SetType(base)
+      case _ => Untyped
+    }
+  }
 
 
 }

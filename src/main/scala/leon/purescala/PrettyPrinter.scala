@@ -372,7 +372,6 @@ class PrettyPrinter(opts: PrinterOptions, val sb: StringBuffer = new StringBuffe
       case ArraySelect(a, i)         => p"$a($i)"
       case ArrayUpdated(a, i, v)     => p"$a.updated($i, $v)"
       case FiniteArray(exprs)        => p"Array($exprs)"
-      case Distinct(exprs)           => p"distinct($exprs)"
       case Not(expr)                 => p"\u00AC$expr"
       case ValDef(id, tpe)           => p"${typed(id)}"
       case This(_)                   => p"this"

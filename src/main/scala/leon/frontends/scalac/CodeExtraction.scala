@@ -1534,9 +1534,6 @@ trait CodeExtraction extends ASTExtractors {
             case (IsTyped(a1, at: ArrayType), "length", Nil) =>
               ArrayLength(a1)
 
-            case (IsTyped(a1, at: ArrayType), "clone", Nil) =>
-              ArrayClone(a1)
-
             case (IsTyped(a1, at: ArrayType), "updated", List(k, v)) =>
               ArrayUpdated(a1, k, v)
 

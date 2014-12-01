@@ -421,10 +421,6 @@ object Trees {
     def getType = ArrayType(defaultValue.getType)
   }
 
-  case class ArrayClone(array: Expr) extends Expr {
-    def getType = array.getType
-  }
-
   case class SetMin(set: Expr) extends Expr {
     val getType = Int32Type
   }

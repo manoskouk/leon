@@ -366,7 +366,6 @@ class PrettyPrinter(opts: PrinterOptions, val sb: StringBuffer = new StringBuffe
       case MapGet(m,k)               => p"$m($k)"
       case MapIsDefinedAt(m,k)       => p"$m.isDefinedAt($k)"
       case ArrayLength(a)            => p"$a.length"
-      case ArrayClone(a)             => p"$a.clone"
       case ArrayFill(size, v)        => p"Array.fill($size)($v)"
       case ArraySelect(a, i)         => p"$a($i)"
       case ArrayUpdated(a, i, v)     => p"$a.updated($i, $v)"

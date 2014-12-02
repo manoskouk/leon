@@ -487,6 +487,9 @@ trait AbstractZ3Solver
     }
 
     def rec(ex: Expr): Z3AST = ex match {
+      case p @ Passes(_, _, _) =>
+        rec(p.asConstraint)
+
       case me @ MatchExpr(s, cs) =>
         rec(matchToIfThenElse(me))
       

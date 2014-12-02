@@ -321,16 +321,6 @@ class PrettyPrinter(opts: PrinterOptions, val sb: StringBuffer = new StringBuffe
           p"($args)"
         }
 
-      case FunctionInvocation(TypedFunDef(fd,tps), args) if fullName(fd) == "leon.lang.passes" =>
-        import utils.ASCIIHelpers._
-        val Seq(in, out, FiniteMap(pairs)) = args
-        val headRow = Row(Seq(Cell(in), Cell(out)))
-        val rows = pairs map { case (in, out) => Row(Seq(Cell(in), Cell(out))) }
-        val table = Table("IO examples", headRow +: Separator +: rows)
-        p"""|
-            |${table.render(ctx.lvl+2)}
-            |"""
-
       case FunctionInvocation(tfd, args) =>
         p"${tfd.id}"
 

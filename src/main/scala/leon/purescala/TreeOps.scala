@@ -850,22 +850,22 @@ object TreeOps {
     postMap(rewritePM)(expr)
   }
 
-  def matchCasePathConditions(m : MatchLike, pathCond: List[Expr]) : Seq[List[Expr]] = m match {
-    case MatchLike(scrut, cases, _) => 
-      var pcSoFar = pathCond
-      for (c <- cases) yield {
+  def matchCasePathConditions(m: MatchExpr, pathCond: List[Expr]) : Seq[List[Expr]] = {
+    val MatchExpr(scrut, cases) = m
+    var pcSoFar = pathCond
+    for (c <- cases) yield {
 
-        val g = c.optGuard getOrElse BooleanLiteral(true)
-        val cond = conditionForPattern(scrut, c.pattern, includeBinders = true)
-        val localCond = pcSoFar :+ cond :+ g
-        
-        // These contain no binders defined in this MatchCase
-        val condSafe = conditionForPattern(scrut, c.pattern)
-        val gSafe = replaceFromIDs(mapForPattern(scrut, c.pattern),g)
-        pcSoFar ::= not(and(condSafe, gSafe))
+      val g = c.optGuard getOrElse BooleanLiteral(true)
+      val cond = conditionForPattern(scrut, c.pattern, includeBinders = true)
+      val localCond = pcSoFar :+ cond :+ g
+      
+      // These contain no binders defined in this MatchCase
+      val condSafe = conditionForPattern(scrut, c.pattern)
+      val gSafe = replaceFromIDs(mapForPattern(scrut, c.pattern),g)
+      pcSoFar ::= not(and(condSafe, gSafe))
 
-        localCond
-      }
+      localCond
+    }
   }
 
 

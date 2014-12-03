@@ -173,7 +173,7 @@ class PrettyPrinter(opts: PrinterOptions, val sb: StringBuffer = new StringBuffe
         p"$id"
 
       case LetTuple(bs,d,e) =>
-        e match {
+        optB { e match {
           case _:LetDef | _ : Let | _ : LetTuple =>
             p"""|val ($bs) = {
                 |  $d
@@ -182,9 +182,9 @@ class PrettyPrinter(opts: PrinterOptions, val sb: StringBuffer = new StringBuffe
           case _ =>
             p"""|val ($bs) = $d;
                 |$e"""
-        }
+        }}
       case Let(b,d,e) =>
-        e match {
+        optB { e match {
           case _:LetDef | _ : Let | _ : LetTuple =>
             p"""|val $b = {
                 |  $d
@@ -193,7 +193,7 @@ class PrettyPrinter(opts: PrinterOptions, val sb: StringBuffer = new StringBuffe
           case _ =>
             p"""|val $b = $d;
                 |$e"""
-        }
+        }}
       case LetDef(fd,body) =>
         optB {
           p"""|$fd

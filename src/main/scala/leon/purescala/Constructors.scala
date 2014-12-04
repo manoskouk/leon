@@ -68,8 +68,21 @@ object Constructors {
     }
   }
 
-  def matchExpr(scrutinee : Expr, cases : Seq[MatchCase]) : MatchExpr = 
-    MatchExpr(scrutinee, filterCases(scrutinee.getType, cases))
+  def matchExpr(scrutinee : Expr, cases : Seq[MatchCase]) : Expr ={
+    val filtered = filterCases(scrutinee.getType, cases)
+    if (filtered.nonEmpty)
+      MatchExpr(scrutinee, filtered)
+    else 
+      Error(
+        cases match {
+          case Seq(hd, _*) => hd.rhs.getType
+          case Seq() => Untyped
+        },
+        "No case matches the scrutinee"
+      )
+  } 
+    
+   
 
   def and(exprs: Expr*): Expr = {
     val flat = exprs.flatMap(_ match {

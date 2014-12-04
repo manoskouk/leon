@@ -223,7 +223,7 @@ object Extractors {
   }
 
   object MatchLike {
-    def unapply(m : MatchLike) : Option[(Expr, Seq[MatchCase], (Expr, Seq[MatchCase]) => MatchLike)] = {
+    def unapply(m : MatchLike) : Option[(Expr, Seq[MatchCase], (Expr, Seq[MatchCase]) => Expr)] = {
       Option(m) map { m => 
         (m.scrutinee, m.cases, m match {
           case _ : MatchExpr  => matchExpr
@@ -231,7 +231,7 @@ object Extractors {
           case _ : Passes     => 
             (s, cases) => {
               val Tuple(Seq(in, out)) = s
-              passes(in,out,cases)
+              passes(in, out, cases)
             }
         })
       }

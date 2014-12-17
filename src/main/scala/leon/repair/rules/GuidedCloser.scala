@@ -48,7 +48,8 @@ case object GuidedCloser extends NormalizingRule("Guided Closer") {
             printer("== Unknown ==")
           }
           //None
-          Some(Solution(BooleanLiteral(true), Set(), wrappedE, false))
+          //Some(Solution(BooleanLiteral(true), Set(), wrappedE, false))
+          None
 
         case _ =>
           sctx.reporter.ifDebug { printer =>

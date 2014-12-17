@@ -17,7 +17,7 @@ import xlang.Trees._
 import solvers.SolverFactory
 import synthesis.ConvertHoles.convertHoles
 
-abstract class RecursiveEvaluator(ctx: LeonContext, prog: Program, maxSteps: Int) extends Evaluator(ctx, prog) {
+abstract class RecursiveEvaluator(ctx: LeonContext, prog: Program, maxSteps: Int, cacheFunctionCalls: Boolean = false) extends Evaluator(ctx, prog) {
   val name = "evaluator"
   val description = "Recursive interpreter for PureScala expressions"
 
@@ -47,6 +47,10 @@ abstract class RecursiveEvaluator(ctx: LeonContext, prog: Program, maxSteps: Int
     def maxSteps = RecursiveEvaluator.this.maxSteps
 
     var stepsLeft = maxSteps
+    
+    var cachedFCs : Map[(FunDef, Seq[Expr]), Expr] = Map()
+    
+    def cacheFC(fd : FunDef, args : Seq[Expr], result : Expr) = cachedFCs += (fd, args) -> result
   }
 
   def initRC(mappings: Map[Identifier, Expr]): RC
@@ -121,44 +125,54 @@ abstract class RecursiveEvaluator(ctx: LeonContext, prog: Program, maxSteps: Int
       }
 
     case FunctionInvocation(tfd, args) =>
+      
+      // Reduce stepsLeft before descending into args
       if (gctx.stepsLeft < 0) {
         throw RuntimeError("Exceeded number of allocated methods calls ("+gctx.maxSteps+")")
       }
       gctx.stepsLeft -= 1
-
+    
       val evArgs = args.map(a => e(a))
-
-      // build a mapping for the function...
-      val frame = rctx.withVars((tfd.params.map(_.id) zip evArgs).toMap)
       
-      if(tfd.hasPrecondition) {
-        e(tfd.precondition.get)(frame, gctx) match {
-          case BooleanLiteral(true) =>
-          case BooleanLiteral(false) =>
-            throw RuntimeError("Precondition violation for " + tfd.id.name + " reached in evaluation.: " + tfd.precondition.get)
-          case other =>
-            throw RuntimeError(typeErrorMsg(other, BooleanType))
-        }
+      gctx.cachedFCs get (tfd.fd, evArgs) match {
+        case Some(res) =>
+          gctx.stepsLeft += 1 //Turns out we didn't call a function, after all
+          res
+          
+        case None =>       
+          // build a mapping for the function...
+          val frame = rctx.withVars((tfd.params.map(_.id) zip evArgs).toMap)
+          
+          if(tfd.hasPrecondition) {
+            e(tfd.precondition.get)(frame, gctx) match {
+              case BooleanLiteral(true) =>
+              case BooleanLiteral(false) =>
+                throw RuntimeError("Precondition violation for " + tfd.id.name + " reached in evaluation.: " + tfd.precondition.get)
+              case other =>
+                throw RuntimeError(typeErrorMsg(other, BooleanType))
+            }
+          }
+    
+          if(!tfd.hasBody && !rctx.mappings.isDefinedAt(tfd.id)) {
+            throw EvalError("Evaluation of function with unknown implementation.")
+          }
+    
+          val body = tfd.body.getOrElse(rctx.mappings(tfd.id))
+          val callResult = e(body)(frame, gctx)
+
+          if(tfd.hasPostcondition) {
+            val (id, post) = tfd.postcondition.get
+    
+            e(post)(frame.withNewVar(id, callResult), gctx) match {
+              case BooleanLiteral(true) =>
+              case BooleanLiteral(false) => throw RuntimeError("Postcondition violation for " + tfd.id.name + " reached in evaluation.")
+              case other => throw EvalError(typeErrorMsg(other, BooleanType))
+            }
+          }
+    
+          if (cacheFunctionCalls) gctx.cacheFC(tfd.fd, evArgs, callResult)
+          callResult
       }
-
-      if(!tfd.hasBody && !rctx.mappings.isDefinedAt(tfd.id)) {
-        throw EvalError("Evaluation of function with unknown implementation.")
-      }
-
-      val body = tfd.body.getOrElse(rctx.mappings(tfd.id))
-      val callResult = e(body)(frame, gctx)
-
-      if(tfd.hasPostcondition) {
-        val (id, post) = tfd.postcondition.get
-
-        e(post)(frame.withNewVar(id, callResult), gctx) match {
-          case BooleanLiteral(true) =>
-          case BooleanLiteral(false) => throw RuntimeError("Postcondition violation for " + tfd.id.name + " reached in evaluation.")
-          case other => throw EvalError(typeErrorMsg(other, BooleanType))
-        }
-      }
-
-      callResult
 
     case And(args) if args.isEmpty =>
       BooleanLiteral(true)
@@ -525,6 +539,8 @@ abstract class RecursiveEvaluator(ctx: LeonContext, prog: Program, maxSteps: Int
     }
   }
 
+  def cachedFunctionCalls = lastGC.map{_.cachedFCs }.getOrElse(Map())
+  
   def typeErrorMsg(tree : Expr, expected : TypeTree) : String = "Type error : expected %s, found %s.".format(expected, tree)
 
 }

@@ -7,7 +7,7 @@ import purescala.Common._
 import purescala.Trees._
 import purescala.Definitions._
 
-class DefaultEvaluator(ctx: LeonContext, prog: Program) extends RecursiveEvaluator(ctx, prog, 50000) {
+class DefaultEvaluator(ctx: LeonContext, prog: Program, cacheFunctionCalls: Boolean = false) extends RecursiveEvaluator(ctx, prog, 50000, cacheFunctionCalls) {
   type RC = DefaultRecContext
   type GC = GlobalContext
 

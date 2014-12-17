@@ -170,20 +170,16 @@ class Repairman(ctx: LeonContext, initProgram: Program, fd: FunDef, verifTimeout
       // We don't want tests whose invocation will call other failing tests.
       // This is because they will appear erroneous, 
       // even though the error comes from the called test
-      val testEval : CollectingEvaluator = new CollectingEvaluator(ctx, program){
-        def collecting(e : Expr) : Option[Seq[Expr]] = e match {
-          case fi@FunctionInvocation(TypedFunDef(`fd`, _), args) => 
-            Some(args)
-          case _ => None
-        }
-      }
+      val testEval = new DefaultEvaluator(ctx, program, cacheFunctionCalls = true)
 
       val passingTs = for (test <- passingTests) yield InExample(test.ins)
       val failingTs = for (test <- failingTests) yield InExample(test.ins)
 
       val test2Tests : Map[InExample, Set[InExample]] = (failingTs ++ passingTs).map{ ts => 
         testEval.eval(body, args.zip(ts.ins).toMap)
-        (ts, testEval.collected map (InExample(_)))
+        (ts, testEval.cachedFunctionCalls.keySet collect {
+          case (`fd`, args) => InExample(args)
+        })
       }.toMap
 
       val recursiveTests : Set[InExample] = test2Tests.values.toSet.flatten -- (failingTs ++ passingTs)

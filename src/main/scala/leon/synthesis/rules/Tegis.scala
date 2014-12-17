@@ -18,7 +18,7 @@ import utils._
 case object TEGIS extends TEGISLike[TypeTree]("TEGIS") {
   def getParams(sctx: SynthesisContext, p: Problem) = {
     TegisParams(
-      grammar = ExpressionGrammars.default(sctx, p),
+      grammar = ExpressionGrammars.default(sctx, p, allowRecCalls = true),
       rootLabel = {(tpe: TypeTree) => tpe }
     )
   }

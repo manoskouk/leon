@@ -170,13 +170,13 @@ object ExpressionGrammars {
     override def toString = t.toString+"#"+l+depth.map(d => "@"+d).getOrElse("")
   }
 
-  case class SimilarTo(e: Expr, terminals: Set[Expr] = Set(), sctx: SynthesisContext, p: Problem) extends ExpressionGrammar[Label[String]] {
+  case class SimilarTo(e: Expr, terminals: Set[Expr] = Set(), sctx: SynthesisContext, p: Problem, allowRecCalls : Boolean) extends ExpressionGrammar[Label[String]] {
 
     val excludeFCalls = sctx.settings.functionsToIgnore
     
     val normalGrammar = BoundedGrammar(EmbeddedGrammar(
         BaseGrammar ||
-        FunctionCalls(sctx.program, sctx.functionContext, p.as.map(_.getType), excludeFCalls) ||
+        FunctionCalls(sctx.program, sctx.functionContext, p.as.map(_.getType), allowRecCalls, excludeFCalls) ||
         SafeRecCalls(sctx.program, p.ws, p.pc),
       { (t: TypeTree)      => Label(t, "B", None)},
       { (l: Label[String]) => l.getType }
@@ -276,7 +276,7 @@ object ExpressionGrammars {
           case cc @ CaseClass(cct, exprs) =>
             gens(e, gl, exprs, { case ss => CaseClass(cct, ss) }) ++ ccVariations(gl, cc)
 
-          case FunctionInvocation(TypedFunDef(fd, _), _) if excludeFCalls contains fd =>
+          case FunctionInvocation(TypedFunDef(fd, _), _) if (excludeFCalls contains fd) && !allowRecCalls =>
             // We allow only exact call, and/or cegis extensions
             /*Seq(el -> Generator[L, Expr](Nil, { _ => e })) ++*/ cegis(gl)
 
@@ -311,7 +311,7 @@ object ExpressionGrammars {
     }
   }
 
-  case class FunctionCalls(prog: Program, currentFunction: FunDef, types: Seq[TypeTree], exclude: Set[FunDef]) extends ExpressionGrammar[TypeTree] {
+  case class FunctionCalls(prog: Program, currentFunction: FunDef, types: Seq[TypeTree], allowRecCalls : Boolean, exclude: Set[FunDef]) extends ExpressionGrammar[TypeTree] {
    def computeProductions(t: TypeTree): Seq[Gen] = {
 
      def getCandidates(fd: FunDef): Seq[TypedFunDef] = {
@@ -321,8 +321,10 @@ object ExpressionGrammars {
        val isRecursiveCall = (prog.callGraph.transitiveCallers(cfd) + cfd) contains fd
 
        val isDet = fd.body.map(isDeterministic).getOrElse(false)
+       
+       val cond = if (allowRecCalls) (isDet || fd == cfd) else isDet && !isRecursiveCall
 
-       if (!isRecursiveCall && isDet) {
+       if (cond) {
          val free = fd.tparams.map(_.tp)
          canBeSubtypeOf(fd.returnType, free, t) match {
            case Some(tpsMap) =>
@@ -412,14 +414,14 @@ object ExpressionGrammars {
     }
   }
 
-  def default(prog: Program, inputs: Seq[Expr], currentFunction: FunDef, exclude: Set[FunDef], ws: Expr, pc: Expr): ExpressionGrammar[TypeTree] = {
+  def default(prog: Program, inputs: Seq[Expr], currentFunction: FunDef, allowRecCalls: Boolean, exclude: Set[FunDef], ws: Expr, pc: Expr): ExpressionGrammar[TypeTree] = {
     BaseGrammar ||
     OneOf(inputs) ||
-    FunctionCalls(prog, currentFunction, inputs.map(_.getType), exclude) ||
+    FunctionCalls(prog, currentFunction, inputs.map(_.getType), allowRecCalls, exclude) ||
     SafeRecCalls(prog, ws, pc)
   }
 
-  def default(sctx: SynthesisContext, p: Problem): ExpressionGrammar[TypeTree] = {
-    default(sctx.program, p.as.map(_.toVariable), sctx.functionContext, sctx.settings.functionsToIgnore,  p.ws, p.pc)
+  def default(sctx: SynthesisContext, p: Problem, allowRecCalls: Boolean): ExpressionGrammar[TypeTree] = {
+    default(sctx.program, p.as.map(_.toVariable), sctx.functionContext, allowRecCalls, sctx.settings.functionsToIgnore,  p.ws, p.pc)
   }
 }

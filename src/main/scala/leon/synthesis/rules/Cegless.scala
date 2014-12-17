@@ -33,7 +33,7 @@ case object CEGLESS extends CEGISLike[Label[String]]("CEGLESS") {
       }
     }
 
-    val guidedGrammar = guides.map(SimilarTo(_, inputs.toSet, sctx, p)).foldLeft[ExpressionGrammar[Label[String]]](Empty())(_ || _)
+    val guidedGrammar = guides.map(SimilarTo(_, inputs.toSet, sctx, p, allowRecCalls = false)).foldLeft[ExpressionGrammar[Label[String]]](Empty())(_ || _)
 
     CegisParams(
       grammar = guidedGrammar,

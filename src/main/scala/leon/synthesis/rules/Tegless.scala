@@ -33,8 +33,8 @@ case object TEGLESS extends TEGISLike[Label[String]]("TEGLESS") {
       }
     }
 
-    val guidedGrammar = guides.map(SimilarTo(_, inputs.toSet, sctx, p)).foldLeft[ExpressionGrammar[Label[String]]](Empty())(_ || _)
-
+    val guidedGrammar = guides.map(SimilarTo(_, inputs.toSet, sctx, p, allowRecCalls = true)).foldLeft[ExpressionGrammar[Label[String]]](Empty())(_ || _)
+    
     TegisParams(
       grammar = guidedGrammar,
       rootLabel = { (tpe: TypeTree) => Label(tpe, "G0") }

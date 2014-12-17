@@ -77,18 +77,18 @@ abstract class TEGISLike[T <% Typed](name: String) extends Rule(name) {
               sctx.reporter.debug("Got expression "+e)
               timers.testing.start()
               if (tests.forall{ case t =>
-                  val ts = System.currentTimeMillis
-                  val res = evaluator.eval(exprToTest, p.as.zip(t).toMap) match {
-                    case EvaluationResults.Successful(BooleanLiteral(true)) =>
-                      sctx.reporter.debug("Test "+t+" passed!")
-                      true
-                    case _ =>
-                      sctx.reporter.debug("Test "+t+" failed on "+e)
-                      failStat += t -> (failStat(t) + 1)
-                      false
-                  }
-                  res
-                }) {
+                val ts = System.currentTimeMillis
+                val res = evaluator.eval(exprToTest, p.as.zip(t).toMap) match {
+                  case EvaluationResults.Successful(BooleanLiteral(true)) =>
+                    sctx.reporter.debug("Test "+t+" passed!")
+                    true
+                  case _ =>
+                    sctx.reporter.debug("Test "+t+" failed on "+e)
+                    failStat += t -> (failStat(t) + 1)
+                    false
+                }
+                res
+              }) {
                 if (isWrapped) {
                   candidate = Some(e)
                 } else {

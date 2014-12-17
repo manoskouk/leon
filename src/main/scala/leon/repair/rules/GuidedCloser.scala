@@ -1,8 +1,10 @@
 /* Copyright 2009-2014 EPFL, Lausanne */
 
 package leon
-package synthesis
+package repair
 package rules
+
+import synthesis._
 
 import leon.utils.Simplifiers
 import purescala.Trees._

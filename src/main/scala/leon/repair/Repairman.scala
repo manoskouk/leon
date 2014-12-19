@@ -175,10 +175,8 @@ class Repairman(ctx: LeonContext, initProgram: Program, fd: FunDef, verifTimeout
       // This is because they will appear erroneous, 
       // even though the error comes from the called test
       val testEval = new RepairTrackingEvaluator(ctx, program)
-
-      val failingTs = for (test <- failingTests) yield InExample(test.ins)
-
-      failingTs foreach { ts => 
+      
+      failingTests foreach { ts => 
         testEval.eval(functionInvocation(fd, ts.ins))
       }
       
@@ -188,7 +186,7 @@ class Repairman(ctx: LeonContext, initProgram: Program, fd: FunDef, verifTimeout
       val failing = test2Tests filter { case (from, to) => 
         isFailing(from) && (to forall (!isFailing(_)) )
       }
-
+      
       failing.keySet map { case (_, args) => InExample(args) }
     }
 

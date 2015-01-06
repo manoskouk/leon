@@ -267,11 +267,8 @@ class Repairman(ctx: LeonContext, initProgram: Program, fd: FunDef, verifTimeout
   
         case ite @ IfExpr(c, thn, els) =>
           forAllTests(
-            or(
-              replaceFromIDs(Map(out -> IfExpr(    c , thn, els)), spec),
-              replaceFromIDs(Map(out -> IfExpr(not(c), thn, els)), spec)
-            ),
-            env,
+            spec,
+            env + (out -> IfExpr(not(c), thn, els)),
             new RepairNDEvaluator(ctx,program,fd,c)
           ) match {
             case Some(true) =>

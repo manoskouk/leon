@@ -207,21 +207,25 @@ class Repairman(ctx: LeonContext, initProgram: Program, fd: FunDef, verifTimeout
     //  - returns Some(true) if for all tests e evaluates to true
     //  - returns Some(false) if for all tests e evaluates to false
     //  - returns None otherwise
-    def forAllTests(e: Expr, env: Map[Identifier, Expr]): Option[Boolean] = {
-      val results = minimalFailingTests.map { ex =>
+    def forAllTests(e: Expr, env: Map[Identifier, Expr], evaluator: Evaluator): Option[Boolean] = {
+      var soFar : Option[Boolean] = None
+      minimalFailingTests.foreach { ex =>
         val ins = ex.ins
         evaluator.eval(e, env ++ (args zip ins)) match {
-          case EvaluationResults.Successful(BooleanLiteral(true))  => Some(true)
-          case EvaluationResults.Successful(BooleanLiteral(false)) => Some(false)
-          case e => None
+          case EvaluationResults.Successful(BooleanLiteral(b)) => 
+            soFar match {
+              case None => 
+                soFar = Some(b)
+              case Some(`b`) =>
+              case _ => 
+                return None
+            }
+          case e =>
+            return None
         }
       }
 
-      if (results.size == 1) {
-        results.head
-      } else {
-        None
-      }
+      soFar
     }
 
     def focus(expr: Expr, env: Map[Identifier, Expr])(implicit spec: Expr, out: Identifier): (Expr, Expr) = {
@@ -237,7 +241,7 @@ class Repairman(ctx: LeonContext, initProgram: Program, fd: FunDef, verifTimeout
             val map  = mapForPattern(scrut, c.pattern)
   
   
-            forAllTests(cond, env ++ map) match {
+            forAllTests(cond, env ++ map, evaluator) match {
               case Some(true) =>
                 val (b, r) = focus(c.rhs, env ++ map)
                 res = Some((MatchExpr(scrut, cases.map { c2 =>
@@ -262,8 +266,14 @@ class Repairman(ctx: LeonContext, initProgram: Program, fd: FunDef, verifTimeout
           (Let(id, value, b), r)
   
         case ite @ IfExpr(c, thn, els) =>
-          val revCondSpec = replaceFromIDs(Map(out -> IfExpr(c, els, thn)), spec)
-          forAllTests(revCondSpec, env) match {
+          forAllTests(
+            or(
+              replaceFromIDs(Map(out -> IfExpr(    c , thn, els)), spec),
+              replaceFromIDs(Map(out -> IfExpr(not(c), thn, els)), spec)
+            ),
+            env,
+            new RepairNDEvaluator(ctx,program,fd,c)
+          ) match {
             case Some(true) =>
               // If all failing tests succeed with the condition reversed,
               // we focus on the condition
@@ -277,7 +287,7 @@ class Repairman(ctx: LeonContext, initProgram: Program, fd: FunDef, verifTimeout
               (IfExpr(b, thn, els), r)
             case _ =>
               // Try to focus on branches
-              forAllTests(c, env) match {
+              forAllTests(c, env, evaluator) match {
                 case Some(true) =>
                   val (b, r) = focus(thn, env)
                   (IfExpr(c, b, els), r)

@@ -402,9 +402,9 @@ class CompilationUnit(val ctx: LeonContext,
     classes.values.foreach(loader.register _)
   }
 
-  def writeClassFiles() {
+  def writeClassFiles(prefix: String) {
     for ((d, cl) <- classes) {
-      cl.writeToFile(cl.className + ".class")
+      cl.writeToFile(prefix+cl.className + ".class")
     }
   }
 

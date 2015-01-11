@@ -165,7 +165,11 @@ class TemplateGenerator[T](val encoder: TemplateEncoder[T]) {
           exprVars += hid
           Variable(hid)
 
-        case c @ Choose(ids, cond) =>
+        case c @ Choose(ids, cond, Some(impl)) =>
+          rec(pathVar, impl)
+
+
+        case c @ Choose(ids, cond, None) =>
           val cid = FreshIdentifier("choose", true).setType(c.getType)
           exprVars += cid
 

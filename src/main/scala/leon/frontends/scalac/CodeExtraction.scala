@@ -1010,7 +1010,7 @@ trait CodeExtraction extends ASTExtractors {
 
           val UnwrapTuple(ines) = ine
           (oute +: ines) foreach {
-            case Variable(_) => { }
+            case Variable(_) | LeonThis(_) => { }
             case other => ctx.reporter.fatalError(other.getPos, "Only i/o variables are allowed in i/o examples")
           }
           passes(ine, oute, rc)

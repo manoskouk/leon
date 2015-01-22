@@ -146,9 +146,9 @@ object Desugar {
   @induct
   def desugar(e : Trees.Expr) : SimpleE = { e match {
     case Trees.Plus (lhs, rhs) => Plus(desugar(lhs), desugar(rhs))
-    case Trees.Minus(lhs, rhs) => Literal(0)//Plus(desugar(lhs), desugar(rhs)) // FIXME forgot Neg
+    case Trees.Minus(lhs, rhs) => Plus(desugar(lhs), Neg(desugar(rhs)))
     case Trees.LessThan(lhs, rhs) => LessThan(desugar(lhs), desugar(rhs))
-    case Trees.And  (lhs, rhs) => Ite(desugar(lhs), desugar(rhs), Literal(0)) 
+    case Trees.And  (lhs, rhs) => Ite(desugar(lhs), desugar(rhs), Literal(1)) // FIXME 1 instead of 0
     case Trees.Or   (lhs, rhs) => Ite(desugar(lhs), Literal(1), desugar(rhs))
     case Trees.Not(e) => Ite(desugar(e), Literal(0), Literal(1))
     case Trees.Eq(lhs, rhs) =>
@@ -157,10 +157,7 @@ object Desugar {
     case Trees.IntLiteral(v)  => Literal(v)
     case Trees.BoolLiteral(b) => Literal(b2i(b))
   }} ensuring { res => 
-    sem(res) == Semantics.semUntyped(e) && ((e,res) passes {
-      case Trees.Minus(Trees.IntLiteral(42), Trees.IntLiteral(i)) => 
-        Plus(Literal(42), Neg(Literal(i)))
-    })
+    sem(res) == Semantics.semUntyped(e)
   }
 
   def sem(e : SimpleE) : Int = e match {

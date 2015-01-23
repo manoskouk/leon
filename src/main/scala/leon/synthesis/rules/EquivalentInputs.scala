@@ -46,7 +46,12 @@ case object EquivalentInputs extends NormalizingRule("EquivalentInputs") {
         }
       }
 
-      ccSubsts.flatten
+      // Direct equivalences:
+      val directEqs = allClauses.collect {
+        case Equals(v1 @ Variable(a1), v2 @ Variable(a2)) if a1 != a2 => (v2, v1)
+      }
+
+      ccSubsts.flatten ++ directEqs
     }
 
 
@@ -56,6 +61,8 @@ case object EquivalentInputs extends NormalizingRule("EquivalentInputs") {
       val newClauses = substs.map{ case(e,v) => Equals(v, e) } // clauses are directed: foo = obj.f
       substs ++ discoverEquivalences(clauses ++ newClauses)
     }, 5)(Set()).toSeq
+
+    println(substs)
 
 
     // We are replacing foo(a) with b. We inject postcondition(foo)(a, b).
@@ -78,7 +85,9 @@ case object EquivalentInputs extends NormalizingRule("EquivalentInputs") {
         _:Expr
       )
       
-      List(decomp(List(sub), forwardMap(subst), "Equivalent Inputs"))
+      val substString = substs.map { case (f, t) => f+" -> "+t }
+
+      List(decomp(List(sub), forwardMap(subst), "Equivalent Inputs ("+substString.mkString(", ")+")"))
     } else {
       Nil
     }

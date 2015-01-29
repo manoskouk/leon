@@ -193,16 +193,11 @@ sealed abstract class List0[T] {
   def init: List0[T] = (this match {
     case Cons0(h, Nil0()) =>
       Nil0[T]()
-    //case Cons0(h, t) =>
-    //  Cons0[T](h, t.init)
+    case Cons0(h, t) =>
+      Cons0[T](h, t.init)
     case Nil0() =>
       Nil0[T]()
-  }) ensuring ( (r: List0[T]) => 
-    ((r.size < this.size) || (this.size == 0)) &&
-    ((this, r) passes {
-      case Cons0(a, Cons0(b, Cons0(c, Nil0()))) => Cons0(a, Cons0(b, Nil0()))
-    })
-  )
+  }) ensuring ( (r: List0[T]) => ((r.size < this.size) || (this.size == 0)) )
 
   def lastOption: Option[T] = this match {
     case Cons0(h, t) =>
@@ -238,16 +233,19 @@ sealed abstract class List0[T] {
       Cons0(Nil0(), Nil0())
   }
 
-  def count(e: T): Int = this match {
+  def count(e: T): Int = { this match {
     case Cons0(h, t) =>
       if (h == e) {
-        1 + t.count(e)
+        t.count(e) // FIXME +1
       } else {
         t.count(e)
       }
     case Nil0() =>
       0
-  }
+  }} ensuring {((this, e), _) passes {
+    case (Cons0(a, Cons0(b, Cons0(a1, Cons0(b2, Nil0())))), a2) if a == a1 && a == a2 && b != a2 && b2 != a2 => 2
+    case (Cons0(a, Cons0(b, Nil0())), c) if a != c && b != c => 0
+  }}
 
   def evenSplit: (List0[T], List0[T]) = {
     val c = size/2

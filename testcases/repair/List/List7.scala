@@ -77,15 +77,15 @@ sealed abstract class List0[T] {
       }
   }
 
-  def drop(i: Int): List0[T] = (this, i) match {
+  def drop(i: Int): List0[T] = { (this, i) match {
     case (Nil0(), _) => Nil0()
     case (Cons0(h, t), i) =>
-      if (i == 0) {
-        Cons0(h, t)
-      } else {
-        t.drop(i-1)
-      }
-  }
+      t.drop(i-1) //FIXME missing if-split
+  }} ensuring { res => ((this, i), res) passes { 
+    case (l@Cons0(_, Nil0()), 42) => l
+    case (Cons0(a, t), 0) => t
+    case (Cons0(a, Cons0(b, Nil0())), 1) => Cons0(a, Nil0())
+  }}
 
   def slice(from: Int, to: Int): List0[T] = {
     require(from < to && to < size && from >= 0)

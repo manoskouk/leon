@@ -62,8 +62,6 @@ case object EquivalentInputs extends NormalizingRule("EquivalentInputs") {
       substs ++ discoverEquivalences(clauses ++ newClauses)
     }, 5)(Set()).toSeq
 
-    println(substs)
-
 
     // We are replacing foo(a) with b. We inject postcondition(foo)(a, b).
     val postsToInject = substs.collect {

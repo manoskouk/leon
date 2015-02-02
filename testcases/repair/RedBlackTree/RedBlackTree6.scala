@@ -127,7 +127,7 @@ object RedBlackTree {
 
   def add(x: Int, t: Tree): Tree = {
     require(redNodesHaveBlackChildren(t) && blackBalanced(t) && keysSorted(t))
-    makeBlack(ins(x, t))
+    ins(x, t) // FIXME forgot makeBlack
   } ensuring { res => 
     res.content == t.content ++ Set(x) && 
     redNodesHaveBlackChildren(res) && 
@@ -143,7 +143,7 @@ object RedBlackTree {
       case Node(Black,Node(Red,Node(Red,a,xV,b),yV,c),zV,d) => 
         Node(Red,Node(Black,a,xV,b),yV,Node(Black,c,zV,d))
       case Node(Black,Node(Red,a,xV,Node(Red,b,yV,c)),zV,d) => 
-        Node(Red,Node(Black,a,xV,b),xV,Node(Black,c,zV,d)) // FIXME xv -> yV in the top node
+        Node(Red,Node(Black,a,xV,b),yV,Node(Black,c,zV,d))
       case Node(Black,a,xV,Node(Red,Node(Red,b,yV,c),zV,d)) => 
         Node(Red,Node(Black,a,xV,b),yV,Node(Black,c,zV,d))
       case Node(Black,a,xV,Node(Red,b,yV,Node(Red,c,zV,d))) => 

@@ -92,12 +92,23 @@ object RedBlackTree {
   // <<insert element x into the tree t>>
   def ins(x: Int, t: Tree): Tree = {
     require(redNodesHaveBlackChildren(t) && blackBalanced(t) && keysSorted(t))
-    t match {
+    val newT = t match {
       case Empty => Node(Red,Empty,x,Empty)
       case n@Node(c,a,y,b) =>
-        if      (x < y)  balance(Node(c, ins(x, a), y, b))
+        if      (x < y)  Node(c, ins(x, a), y, b)
         else if (x == y) n
-        else             balance(Node(c, a, y, ins(x, b)))
+        else             Node(c, a, y, ins(x, b))
+    }  
+    newT match {
+      case Node(Black,Node(Red,Node(Red,a,xV,b),yV,c),zV,d) => 
+        Node(Red,Node(Black,a,xV,b),yV,Node(Black,c,zV,d))
+      case Node(Black,Node(Red,a,xV,Node(Red,b,yV,c)),zV,d) => 
+        Node(Red,Node(Black,a,xV,b),yV,Node(Black,c,xV,d)) // FIXME: second xV -> zV
+      case Node(Black,a,xV,Node(Red,Node(Red,b,yV,c),zV,d)) => 
+        Node(Red,Node(Black,a,xV,b),yV,Node(Black,c,zV,d))
+      case Node(Black,a,xV,Node(Red,b,yV,Node(Red,c,zV,d))) => 
+        Node(Red,Node(Black,a,xV,b),yV,Node(Black,c,zV,d))
+      case other => other 
     }
   } ensuring (res => 
     res.content == t.content ++ Set(x) &&
@@ -135,25 +146,4 @@ object RedBlackTree {
     keysSorted(res)
   }
   
-  
-  def balance(t : Tree) : Tree = {
-    require(keysSorted(t))
-    t match {
-      case Empty => Empty
-      case Node(Black,Node(Red,Node(Red,a,xV,b),yV,c),zV,d) => 
-        Node(Red,Node(Black,a,xV,b),yV,Node(Black,c,zV,d))
-      case Node(Black,Node(Red,a,xV,Node(Red,b,yV,c)),zV,d) => 
-        Node(Red,Node(Black,a,xV,b),yV,Node(Black,c,xV,d)) // FIXME: second xV -> zV
-      case Node(Black,a,xV,Node(Red,Node(Red,b,yV,c),zV,d)) => 
-        Node(Red,Node(Black,a,xV,b),yV,Node(Black,c,zV,d))
-      case Node(Black,a,xV,Node(Red,b,yV,Node(Red,c,zV,d))) => 
-        Node(Red,Node(Black,a,xV,b),yV,Node(Black,c,zV,d))
-      case other => other 
-    }
-  } ensuring { res => 
-    res.content == t.content &&
-    keysSorted(res)
-  }
-    
-
 }

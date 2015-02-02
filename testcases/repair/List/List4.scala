@@ -77,15 +77,15 @@ sealed abstract class List0[T] {
       }
   }
 
-  def drop(i: Int): List0[T] = (this, i) match {
+  def drop(i: Int): List0[T] = { (this, i) match {
     case (Nil0(), _) => Nil0()
     case (Cons0(h, t), i) =>
-      if (i == 0) {
-        Cons0(h, t)
-      } else {
-        t.drop(i-1)
-      }
-  }
+      t.drop(i-1) //FIXME missing if-split
+  }} ensuring { res => ((this, i), res) passes { 
+    case (l@Cons0(_, Nil0()), 42) => l
+    case (Cons0(a, t), 0) => t
+    case (Cons0(a, Cons0(b, Nil0())), 1) => Cons0(a, Nil0())
+  }}
 
   def slice(from: Int, to: Int): List0[T] = {
     require(from < to && to < size && from >= 0)
@@ -177,20 +177,18 @@ sealed abstract class List0[T] {
     }
   }
 
-  def find(e: T): Option[Int] = { this match {
+  def find(e: T): Option[Int] = this match {
     case Nil0() => None()
     case Cons0(h, t) =>
-      //if (h == e) {
-      //  Some(0)
-      //} else {
+      if (h == e) {
+        Some(0)
+      } else {
         t.find(e) match {
           case None()  => None()
           case Some(i) => Some(i+1)
         }
-      //}
-  }} ensuring { res => res.isDefined == this.contains(e) && (((this,e), res) passes {
-    case (Cons0(a, Cons0(b, Nil0())), c) if a == b && a == c => Some(0)
-  })}
+      }
+  }
 
   def init: List0[T] = (this match {
     case Cons0(h, Nil0()) =>

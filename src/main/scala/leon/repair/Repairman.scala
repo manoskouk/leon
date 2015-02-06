@@ -94,13 +94,13 @@ class Repairman(ctx: LeonContext, initProgram: Program, fd: FunDef, verifTimeout
           
           reporter.info(f" - Minimal Failing Set Size: ${minimalFailingTests.size}%3d")
           
-          reporter.ifDebug { printer =>
-            printer(new ExamplesTable("Minimal failing:", minimalFailingTests.toSeq).toString)
-          }
           val initTime = t1.stop
           result = result.copy(initTime = Some(initTime))
           reporter.info("Finished in "+initTime+"ms")
       
+          reporter.ifDebug { printer =>
+            printer(new ExamplesTable("Minimal failing:", minimalFailingTests.toSeq).toString)
+          }
       
           reporter.info(ASCIIHelpers.title("2. Locating/Focusing synthesis problem"))
           val t2    = new Timer().start

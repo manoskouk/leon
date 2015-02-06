@@ -27,7 +27,7 @@ object MergeSort {
         if (h1 <= h2) 
           Cons(h1, merge(t1, l2))
         else 
-          Cons(h2, merge(l1, t2))
+          merge(l1, t2) // FIXME missing Cons(h2
       case (Nil(), _) => l2
       case (_, Nil()) => l1
     }
@@ -42,7 +42,7 @@ object MergeSort {
     case Cons(_, Nil()) => l
     case other =>
       val (l1, l2) = split(other)
-      merge(mergeSort(l1), l2) // FIXME mergesort l2
+      merge(mergeSort(l1), mergeSort(l2))
   }} ensuring { res =>
     isSorted(res) &&
     res.content == l.content &&

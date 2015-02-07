@@ -625,7 +625,10 @@ class PrettyPrinter(opts: PrinterOptions, val sb: StringBuffer = new StringBuffe
       case FcallMethodInvocation(rec, _, name, Nil, List(a)) =>
 
         if (makeBinary contains name) {
-          Some((rec, name, a))
+          if(name == "::")
+            Some((a, name, rec))
+          else
+            Some((rec, name, a))
         } else {
           None
         }

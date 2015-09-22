@@ -2,13 +2,19 @@
 
 package leon.solvers.smtlib
 
-import leon.purescala.Common.Identifier
+import leon.purescala.Common._
 import leon.purescala.Constructors._
 import leon.purescala.Definitions.FunDef
 import leon.purescala.ExprOps._
 import leon.purescala.Expressions._
+import leon.purescala.Extractors.IsTyped
+import leon.purescala.Types._
+
 import leon.verification.VC
-import smtlib.parser.Terms.{ Term, Forall => SMTForall, _ }
+
+import smtlib.parser.Terms.{Forall => SMTForall, SSymbol, Term}
+import smtlib.parser.Commands.{Assert => SMTAssert, _}
+import smtlib.theories.ArraysEx
 
 trait SMTLIBQuantifiedSolver extends SMTLIBSolver {
 
@@ -46,10 +52,26 @@ trait SMTLIBQuantifiedSolver extends SMTLIBSolver {
   }
 
   override protected def toSMT(e: Expr)(implicit bindings: Map[Identifier, Term]): Term = e match {
+    case IsTyped(Lambda(args, body), ft) =>
+      val id = FreshIdentifier("lambda", ft)
+      val smtId = declareVariable(id)
+      sendCommand(SMTAssert(
+        quantifiedTerm(
+          SMTForall,
+          args map { _.id },
+          Equals(
+            application(Variable(id), args map { _.toVariable }),
+            body
+          )
+        )
+      ))
+      smtId
+    case Application(callee, args) =>
+      ArraysEx.Select(toSMT(callee), toSMT(tupleWrap(args)))
     case Forall(vs, bd) =>
       quantifiedTerm(SMTForall, vs map { _.id }, bd)
     case _ =>
-      super.toSMT(e)(bindings)
+      super.toSMT(e)
   }
 
   // We need to know the function context.

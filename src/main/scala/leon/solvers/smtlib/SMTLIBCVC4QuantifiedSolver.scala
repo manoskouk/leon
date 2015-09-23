@@ -84,7 +84,7 @@ abstract class SMTLIBCVC4QuantifiedSolver(context: LeonContext, program: Program
       } catch {
         case _: SolverUnsupportedError =>
           addError()
-          toSMT(Error(tfd.body.get.getType, ""))(Map())
+          toSMT(Error(tfd.returnType, ""))(Map())
       }
     }
 

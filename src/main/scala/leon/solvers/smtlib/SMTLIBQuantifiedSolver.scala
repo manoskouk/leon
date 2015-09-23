@@ -9,6 +9,7 @@ import leon.purescala.ExprOps._
 import leon.purescala.Expressions._
 import leon.purescala.Extractors.IsTyped
 import leon.purescala.Types._
+import leon.utils.IncrementalBijection
 
 import leon.verification.VC
 
@@ -47,25 +48,33 @@ trait SMTLIBQuantifiedSolver extends SMTLIBSolver {
 
     // We want to check if the negation of the vc is sat under inductive hyp.
     // So we need to see if (indHyp /\ !vc) is satisfiable
-    liftLets(matchToIfThenElse(andJoin(inductiveHyps :+ not(cond))))
+    andJoin(inductiveHyps :+ not(cond))
 
   }
 
+  private def preprocess(e: Expr) = liftLets(matchToIfThenElse(liftLambdas(withInductiveHyp(e))))
+
+  protected def liftLambdas(e: Expr) = {
+    var lambdas = Seq[Expr]()
+
+    val lambdaFree = postMap {
+      case IsTyped(Lambda(args, body), ft) =>
+        val id = FreshIdentifier("lambda", ft)
+        lambdas +:= Forall(args, Equals(
+          application(Variable(id), args map {
+            _.toVariable
+          }),
+          body
+        ))
+        Some(Variable(id))
+      case _ =>
+        None
+    }(e)
+
+    andJoin(lambdas :+ lambdaFree)
+  }
+
   override protected def toSMT(e: Expr)(implicit bindings: Map[Identifier, Term]): Term = e match {
-    case IsTyped(Lambda(args, body), ft) =>
-      val id = FreshIdentifier("lambda", ft)
-      val smtId = declareVariable(id)
-      sendCommand(SMTAssert(
-        quantifiedTerm(
-          SMTForall,
-          args map { _.id },
-          Equals(
-            application(Variable(id), args map { _.toVariable }),
-            body
-          )
-        )
-      ))
-      smtId
     case Application(callee, args) =>
       ArraysEx.Select(toSMT(callee), toSMT(tupleWrap(args)))
     case Forall(vs, bd) =>
@@ -79,7 +88,7 @@ trait SMTLIBQuantifiedSolver extends SMTLIBSolver {
   // the current function, as this may make the proof unsound
   override def assertVC(vc: VC) = {
     currentFunDef = Some(vc.fd)
-    assertCnstr(withInductiveHyp(vc.condition))
+    assertCnstr(preprocess(vc.condition))
   }
 
   // Normally, UnrollingSolver tracks the input variable, but this one

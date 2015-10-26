@@ -602,6 +602,17 @@ trait ASTExtractors {
       }
     }
 
+    object ExConditionally {
+      def unapply(tree: Apply) : Option[Seq[Tree]] = tree match {
+        case a @ Apply(
+          TypeApply(s @ ExSymbol("leon", "lang", "synthesis", "conditionally"), types),
+          args
+        ) =>
+          Some(args)
+        case _ => None
+      }
+    }
+
     object ExWithOracleExpression {
       def unapply(tree: Apply) : Option[(List[(Tree, Symbol)], Tree)] = tree match {
         case a @ Apply(

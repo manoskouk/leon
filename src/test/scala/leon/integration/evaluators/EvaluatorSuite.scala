@@ -5,7 +5,7 @@ package leon.integration.evaluators
 import leon._
 import leon.test._
 import leon.test.helpers._
-import leon.evaluators.{Evaluator => _, DeterministicEvaluator => Evaluator, _}
+import leon.evaluators._
 import leon.purescala.Common._
 import leon.purescala.Definitions._
 import leon.purescala.Expressions._
@@ -235,20 +235,20 @@ class EvaluatorSuite extends LeonTestSuiteWithProgram with ExpressionsDSL {
       |}""".stripMargin
   )
 
-  def normalEvaluators(implicit ctx: LeonContext, pgm: Program): List[Evaluator] = {
+  def normalEvaluators(implicit ctx: LeonContext, pgm: Program): List[DeterministicEvaluator] = {
     List(
       new DefaultEvaluator(ctx, pgm),
       new AngelicEvaluator(new StreamEvaluator(ctx, pgm))
     )
   }
 
-  def codegenEvaluators(implicit ctx: LeonContext, pgm: Program): List[Evaluator] = {
+  def codegenEvaluators(implicit ctx: LeonContext, pgm: Program): List[DeterministicEvaluator] = {
     List(
       new CodeGenEvaluator(ctx, pgm)
     )
   }
 
-  def allEvaluators(implicit ctx: LeonContext, pgm: Program): List[Evaluator] = {
+  def allEvaluators(implicit ctx: LeonContext, pgm: Program): List[DeterministicEvaluator] = {
     normalEvaluators ++ codegenEvaluators
   }
 
@@ -369,7 +369,7 @@ class EvaluatorSuite extends LeonTestSuiteWithProgram with ExpressionsDSL {
   }
 
   test("Lambda functions") { implicit fix =>
-    def checkLambda(e: Evaluator, in: Expr, out: PartialFunction[Expr, Boolean]) {
+    def checkLambda(e: DeterministicEvaluator, in: Expr, out: PartialFunction[Expr, Boolean]) {
       val res = eval(e, in).success
       if (!out.isDefinedAt(res) || !out(res))
         throw new AssertionError(s"Evaluation of '$in' with evaluator '${e.name}' produced invalid '$res'.")
@@ -433,7 +433,7 @@ class EvaluatorSuite extends LeonTestSuiteWithProgram with ExpressionsDSL {
     def success: Expr = res
   }
 
-  case class Success(expr: Expr, env: Map[Identifier, Expr], evaluator: Evaluator, res: Expr) extends EvalDSL {
+  case class Success(expr: Expr, env: Map[Identifier, Expr], evaluator: DeterministicEvaluator, res: Expr) extends EvalDSL {
     override def failed = {
       fail(s"Evaluation of '$expr' with '$evaluator' (and env $env) should have failed")
     }
@@ -443,7 +443,7 @@ class EvaluatorSuite extends LeonTestSuiteWithProgram with ExpressionsDSL {
     }
   }
 
-  case class Failed(expr: Expr, env: Map[Identifier, Expr], evaluator: Evaluator, err: String) extends EvalDSL {
+  case class Failed(expr: Expr, env: Map[Identifier, Expr], evaluator: DeterministicEvaluator, err: String) extends EvalDSL {
     override def success = {
       fail(s"Evaluation of '$expr' with '$evaluator' (and env $env) should have succeeded but failed with $err")
     }
@@ -453,7 +453,7 @@ class EvaluatorSuite extends LeonTestSuiteWithProgram with ExpressionsDSL {
     def ===(res: Expr) = success
   }
 
-  def eval(e: Evaluator, toEval: Expr, env: Map[Identifier, Expr] = Map()): EvalDSL = {
+  def eval(e: DeterministicEvaluator, toEval: Expr, env: Map[Identifier, Expr] = Map()): EvalDSL = {
     e.eval(toEval, env) match {
       case EvaluationResults.Successful(res)     => Success(toEval, env, e, res)
       case EvaluationResults.RuntimeError(err)   => Failed(toEval, env, e, err)

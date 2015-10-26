@@ -7,7 +7,6 @@ package rules
 import purescala.Types._
 
 import grammars._
-import utils._
 
 case object CEGIS extends CEGISLike[TypeTree]("CEGIS") {
   def getParams(sctx: SynthesisContext, p: Problem) = {

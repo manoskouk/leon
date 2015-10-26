@@ -370,9 +370,6 @@ object Expressions {
     * [[cases]] should be nonempty. If you are not sure about this, you should use
     * [[purescala.Constructors#passes purescala's constructor passes]]
     *
-    * @param in
-    * @param out
-    * @param cases
     */
   case class Passes(in: Expr, out : Expr, cases : Seq[MatchCase]) extends Expr {
     require(cases.nonEmpty)
@@ -897,6 +894,16 @@ object Expressions {
 
     def extract = {
       Some((alts, (es: Seq[Expr]) => Hole(tpe, es).setPos(this)))
+    }
+  }
+
+  case class Conditionally(alts: Seq[Expr]) extends Expr with Extractable {
+    private val lub = leastUpperBound(alts.map(_.getType))
+    require(lub.isDefined, s"$this has alternatives of incompatible types!")
+    val getType = lub.get
+
+    def extract = {
+      Some((alts, (es: Seq[Expr]) => Conditionally(es).setPos(this)))
     }
   }
 

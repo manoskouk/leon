@@ -91,10 +91,8 @@ class StablePrintingSuite extends LeonRegressionSuite {
             val contentWithLines = j.content.split("\n").zipWithIndex.map{ case (l, i) => f"${i+1}%4d: $l"}.mkString("\n")
             info("Error while compiling:\n"+contentWithLines)
             for (e <- reporter.lastErrors) {
-              info(e)
+              println(e)
             }
-            info(e.getMessage)
-            e.printStackTrace()
             fail("Compilation failed")
         }
 

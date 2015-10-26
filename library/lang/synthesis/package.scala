@@ -38,4 +38,7 @@ package object synthesis {
   @ignore
   def withOracle[A, R](body: Oracle[A] => R): R = noImpl
 
+  @ignore
+  def conditionally[A](alts: A*): A = noImpl
+
 }

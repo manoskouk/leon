@@ -217,7 +217,7 @@ trait SMTLIBTarget extends Interruptible {
       val elems = r.elems.flatMap {
         case (k, CaseClass(leonSome, Seq(x))) => Some(k -> x)
         case (k, _)                           => None
-      }.toMap
+      }
       FiniteMap(elems, from, to)
 
     case other =>
@@ -385,7 +385,8 @@ trait SMTLIBTarget extends Interruptible {
         SMTLet(
           VarBinding(id, value),
           Seq(),
-          newBody)
+          newBody
+        )
 
       case er @ Error(tpe, _) =>
         declareVariable(FreshIdentifier("error_value", tpe))
@@ -495,7 +496,7 @@ trait SMTLIBTarget extends Interruptible {
 
         toSMT(RawArrayValue(from, elems.map {
           case (k, v) => k -> CaseClass(library.someType(to), Seq(v))
-        }.toMap, CaseClass(library.noneType(to), Seq())))
+        }, CaseClass(library.noneType(to), Seq())))
 
       case MapApply(m, k) =>
         val mt @ MapType(_, to) = m.getType
@@ -552,22 +553,20 @@ trait SMTLIBTarget extends Interruptible {
       case Plus(a, b)      => Ints.Add(toSMT(a), toSMT(b))
       case Minus(a, b)     => Ints.Sub(toSMT(a), toSMT(b))
       case Times(a, b)     => Ints.Mul(toSMT(a), toSMT(b))
-      case Division(a, b) => {
+      case Division(a, b) =>
         val ar = toSMT(a)
         val br = toSMT(b)
 
         Core.ITE(
           Ints.GreaterEquals(ar, Ints.NumeralLit(0)),
           Ints.Div(ar, br),
-          Ints.Neg(Ints.Div(Ints.Neg(ar), br)))
-      }
-      case Remainder(a, b) => {
+          Ints.Neg(Ints.Div(Ints.Neg(ar), br))
+        )
+      case Remainder(a, b) =>
         val q = toSMT(Division(a, b))
         Ints.Sub(toSMT(a), Ints.Mul(toSMT(b), q))
-      }
-      case Modulo(a, b) => {
+      case Modulo(a, b) =>
         Ints.Mod(toSMT(a), toSMT(b))
-      }
       case LessThan(a, b) => a.getType match {
         case Int32Type   => FixedSizeBitVectors.SLessThan(toSMT(a), toSMT(b))
         case IntegerType => Ints.LessThan(toSMT(a), toSMT(b))
@@ -620,6 +619,14 @@ trait SMTLIBTarget extends Interruptible {
         }
       case Forall(vs, bd) =>
         quantifiedTerm(SMTForall, vs map { _.id }, bd)(Map())
+      case Conditionally(alts) =>
+        val default = alts.last
+        val cases = alts.init
+        cases.foldRight(toSMT(default)) { case (lhs, rhs) =>
+          val corr = andJoin(collectCorrectnessConditions(lhs) map { _._2 })
+          val cond = declareVariable(FreshIdentifier("cond", BooleanType, alwaysShowUniqueID = true))
+          Core.ITE(Core.And(toSMT(corr), cond), toSMT(lhs), rhs)
+        }
       case o =>
         unsupported(o, "")
     }
@@ -741,8 +748,8 @@ trait SMTLIBTarget extends Interruptible {
               FractionalLiteral(num, 1)
             case _ =>
               val scale = d.scale
-              val num = BigInt(d.bigDecimal.scaleByPowerOfTen(scale).toBigInteger())
-              val denom = BigInt(new java.math.BigDecimal(1).scaleByPowerOfTen(scale).toBigInteger())
+              val num = BigInt(d.bigDecimal.scaleByPowerOfTen(scale).toBigInteger)
+              val denom = BigInt(new java.math.BigDecimal(1).scaleByPowerOfTen(scale).toBigInteger)
               FractionalLiteral(num, denom)
           }
         }
@@ -836,7 +843,7 @@ trait SMTLIBTarget extends Interruptible {
             LessThan(fromSMT(a, IntegerType), fromSMT(b, IntegerType))
 
           case ("+", args) =>
-            args.map(fromSMT(_, otpe)).reduceLeft(plus _)
+            args.map(fromSMT(_, otpe)).reduceLeft(plus)
 
           case ("-", List(a)) if otpe == Some(RealType) =>
             val aexpr = fromSMT(a, otpe)
@@ -860,7 +867,7 @@ trait SMTLIBTarget extends Interruptible {
             Minus(fromSMT(a, otpe), fromSMT(b, otpe))
 
           case ("*", args) =>
-            args.map(fromSMT(_, otpe)).reduceLeft(times _)
+            args.map(fromSMT(_, otpe)).reduceLeft(times)
 
           case ("/", List(a, b)) if otpe == Some(RealType) =>
             val aexpr = fromSMT(a, otpe)

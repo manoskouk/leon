@@ -3,7 +3,6 @@
 package leon
 package solvers
 
-import purescala.Common._
 import purescala.Expressions._
 
 class SimpleSolverAPI(sf: SolverFactory[Solver]) {

@@ -19,6 +19,7 @@ import Witnesses._
   * @param pc The path condition so far
   * @param phi The formula on `as` and `xs` to satisfy
   * @param xs The list of output identifiers for which we want to compute a function
+  * @param eb An [[ExamplesBank]] of input-output examples that will be used to guide synthesis
   */
 case class Problem(as: List[Identifier], ws: Expr, pc: Expr, phi: Expr, xs: List[Identifier], eb: ExamplesBank = ExamplesBank.empty) {
 

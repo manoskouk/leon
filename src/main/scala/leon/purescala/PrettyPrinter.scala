@@ -129,6 +129,9 @@ class PrettyPrinter(opts: PrinterOptions,
           p"?($es)"
         }
 
+      case Conditionally(alts) =>
+        p"conditionally($alts)"
+
       case Forall(args, e) =>
         p"\u2200${typed(args.map(_.id))}. $e"
 

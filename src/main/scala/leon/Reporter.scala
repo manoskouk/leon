@@ -49,7 +49,7 @@ abstract class Reporter(val debugSections: Set[DebugSection]) {
     emit(account(Message(FATAL, pos, msg)))
     onFatal()
   }
-  final def internalError(pos: Position, msg : Any) : Nothing = {
+  final def internalError(pos: Position, msg: Any): Nothing = {
     emit(account(Message(INTERNAL, pos, msg.toString + 
       "\nPlease inform the authors of Leon about this message"
     ))) 

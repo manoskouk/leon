@@ -3,7 +3,7 @@
 package leon
 package evaluators
 
-import leon.purescala.Quantification._
+import purescala.Quantification._
 import purescala.Constructors._
 import purescala.ExprOps._
 import purescala.Expressions.Pattern
@@ -13,9 +13,7 @@ import purescala.Types._
 import purescala.Common._
 import purescala.Expressions._
 import purescala.Definitions._
-import leon.solvers.{HenkinModel, Model, SolverFactory}
-
-import scala.collection.mutable.{Map => MutableMap}
+import leon.solvers.{HenkinModel, SolverFactory}
 
 abstract class RecursiveEvaluator(ctx: LeonContext, prog: Program, maxSteps: Int)
   extends ContextualEvaluator(ctx, prog, maxSteps)
@@ -607,7 +605,6 @@ abstract class RecursiveEvaluator(ctx: LeonContext, prog: Program, maxSteps: Int
   }
 
   def matchesCase(scrut: Expr, caze: MatchCase)(implicit rctx: RC, gctx: GC): Option[(MatchCase, Map[Identifier, Expr])] = {
-    import purescala.TypeOps.isSubtypeOf
 
     def matchesPattern(pat: Pattern, expr: Expr): Option[Map[Identifier, Expr]] = (pat, expr) match {
       case (InstanceOfPattern(ob, pct), e) =>
@@ -630,8 +627,8 @@ abstract class RecursiveEvaluator(ctx: LeonContext, prog: Program, maxSteps: Int
         } else {
           None
         }
-      case (up @ UnapplyPattern(ob, _, subs), scrut) =>
-        e(functionInvocation(up.unapplyFun.fd, Seq(scrut))) match {
+      case (UnapplyPattern(ob, unapplyFun, subs), scrut) =>
+        e(functionInvocation(unapplyFun.fd, Seq(scrut))) match {
           case CaseClass(CaseClassType(cd, _), Seq()) if cd == program.library.None.get =>
             None
           case CaseClass(CaseClassType(cd, _), Seq(arg)) if cd == program.library.Some.get =>
@@ -644,7 +641,7 @@ abstract class RecursiveEvaluator(ctx: LeonContext, prog: Program, maxSteps: Int
               None
             }
           case other =>
-            throw EvalError(typeErrorMsg(other, up.unapplyFun.returnType))
+            throw EvalError(typeErrorMsg(other, unapplyFun.returnType))
         }
       case (TuplePattern(ob, subs), Tuple(args)) =>
         if (subs.size == args.size) {

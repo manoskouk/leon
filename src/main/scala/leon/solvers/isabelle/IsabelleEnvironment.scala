@@ -49,7 +49,7 @@ object IsabelleEnvironment {
         case None =>
           None
       }
-    }.toList
+    }
 
     val setup = Setup.detectSetup(base, version) match {
       case Some(setup) => Future.successful { setup }

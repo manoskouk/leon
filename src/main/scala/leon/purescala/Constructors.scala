@@ -110,7 +110,8 @@ object Constructors {
     canBeSubtypeOf(actualType, typeParamsOf(formalType).toSeq, formalType) match {
       case Some(tmap) =>
         FunctionInvocation(fd.typed(fd.tparams map { tpd => tmap.getOrElse(tpd.tp, tpd.tp) }), args)
-      case None => throw LeonFatalError(s"$args:$actualType cannot be a subtype of $formalType!")
+      case None =>
+        throw LeonFatalError(s"$args:$actualType cannot be a subtype of $formalType!")
     }
   }
 
@@ -276,32 +277,24 @@ object Constructors {
   /** $encodingof simplified `... == ...` (equality).
     * @see [[purescala.Expressions.Equals Equals]]
     */
-  def equality(a: Expr, b: Expr) = {
-    if (a == b && isDeterministic(a)) {
+  def equality(a: Expr, b: Expr) = (a, b) match {
+    case (BooleanLiteral(true), b) => b
+    case (BooleanLiteral(false), b) => not(b)
+    case (a, BooleanLiteral(true)) => a
+    case (a, BooleanLiteral(false)) => not(a)
+    case (a, b) if (a == b && isDeterministic(a)) =>
       BooleanLiteral(true)
-    } else  {
-      (a, b) match {
-        case (a: Literal[_], b: Literal[_]) =>
-          if (a.value == b.value) {
-            BooleanLiteral(true)
-          } else {
-            BooleanLiteral(false)
-          }
-
-        case _ =>
-          Equals(a, b)
-      }
-    }
+    case _ =>
+      Equals(a, b)
   }
 
-  def assertion(c: Expr, err: Option[String], res: Expr) = {
-    if (c == BooleanLiteral(true)) {
+  def assertion(c: Expr, err: Option[String], res: Expr) = c match {
+    case BooleanLiteral(true) =>
       res
-    } else if (c == BooleanLiteral(false)) {
+    case BooleanLiteral(false) =>
       Error(res.getType, err.getOrElse("Assertion failed"))
-    } else {
+    case _ =>
       Assert(c, err, res)
-    }
   }
 
   /** $encodingof simplified `fn(realArgs)` (function application).

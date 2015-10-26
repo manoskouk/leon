@@ -16,6 +16,7 @@ object Grammars {
     BaseGrammar ||
     EqualityGrammar(Set(IntegerType, Int32Type, BooleanType) ++ inputs.map { _.getType }) ||
     OneOf(inputs) ||
+    BooleanGrammar(inputs) ||
     FunctionCalls(prog, currentFunction, inputs.map(_.getType), exclude) ||
     SafeRecursiveCalls(prog, ws, pc)
   }

@@ -8,8 +8,8 @@ import scala.collection.mutable.Queue
 import scala.reflect.runtime.universe._
 
 /**
- * This is a straitforward implementation of solver pools. The goal is to avoid
- * the cost of spawing processes for SMT solvers.
+ * This is a straightforward implementation of solver pools. The goal is to avoid
+ * the cost of spawning processes for SMT solvers.
  *
  * Sadly smt-z3 is the only SMT solver that supports reset.
  *

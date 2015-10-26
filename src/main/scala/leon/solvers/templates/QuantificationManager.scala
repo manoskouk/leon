@@ -185,10 +185,10 @@ class QuantificationManager[T](encoder: TemplateEncoder[T]) extends LambdaManage
 
         (handled.map(_._2) zip prev) ++ uQs
       }
-    }.toMap
+    }
   }
 
-  def assumptions: Seq[T] = quantifications.collect { case q: Quantification => q.currentQ2Var }.toSeq
+  def assumptions: Seq[T] = quantifications.collect { case q: Quantification => q.currentQ2Var }
 
   def instantiations: (Map[TypeTree, Matchers], Map[T, Matchers], Map[Lambda, Matchers]) = {
     var typeInsts: Map[TypeTree, Matchers] = Map.empty

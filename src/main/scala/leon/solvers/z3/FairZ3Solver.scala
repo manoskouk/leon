@@ -83,17 +83,17 @@ class FairZ3Solver(val context: LeonContext, val program: Program)
     val (typeInsts, partialInsts, lambdaInsts) = templateGenerator.manager.instantiations
 
     val typeDomains: Map[TypeTree, Set[Seq[Expr]]] = typeInsts.map {
-      case (tpe, domain) => tpe -> domain.flatMap { case (b, m) => extract(b, m) }.toSet
+      case (tpe, domain) => tpe -> domain.flatMap { case (b, m) => extract(b, m) }
     }
 
     val funDomains: Map[Identifier, Set[Seq[Expr]]] = partialInsts.flatMap {
       case (c, domain) => variables.getA(c).collect {
-        case Variable(id) => id -> domain.flatMap { case (b, m) => extract(b, m) }.toSet
+        case Variable(id) => id -> domain.flatMap { case (b, m) => extract(b, m) }
       }
     }
 
     val lambdaDomains: Map[Lambda, Set[Seq[Expr]]] = lambdaInsts.map {
-      case (l, domain) => l -> domain.flatMap { case (b, m) => extract(b, m) }.toSet
+      case (l, domain) => l -> domain.flatMap { case (b, m) => extract(b, m) }
     }
 
     val asMap = modelToMap(model, ids)
@@ -309,7 +309,7 @@ class FairZ3Solver(val context: LeonContext, val program: Program)
         val leonModel = extractModel(model, freeVars.toSet)
         val fullModel = leonModel ++ (functionsAsMap ++ constantFunctionsAsMap)
 
-        if (!optModel.isDefined) {
+        if (optModel.isEmpty) {
           (false, leonModel)
         } else {
           (evaluator.check(entireFormula, fullModel) match {

@@ -131,15 +131,15 @@ class UnrollingSolver(val context: LeonContext, val program: Program, underlying
     val (typeInsts, partialInsts, lambdaInsts) = templateGenerator.manager.instantiations
 
     val typeDomains: Map[TypeTree, Set[Seq[Expr]]] = typeInsts.map {
-      case (tpe, domain) => tpe -> domain.flatMap { case (b, m) => extract(b, m) }.toSet
+      case (tpe, domain) => tpe -> domain.flatMap { case (b, m) => extract(b, m) }
     }
 
     val funDomains: Map[Identifier, Set[Seq[Expr]]] = partialInsts.map {
-      case (Variable(id), domain) => id -> domain.flatMap { case (b, m) => extract(b, m) }.toSet
+      case (Variable(id), domain) => id -> domain.flatMap { case (b, m) => extract(b, m) }
     }
 
     val lambdaDomains: Map[Lambda, Set[Seq[Expr]]] = lambdaInsts.map {
-      case (l, domain) => l -> domain.flatMap { case (b, m) => extract(b, m) }.toSet
+      case (l, domain) => l -> domain.flatMap { case (b, m) => extract(b, m) }
     }
 
     val asDMap = purescala.Quantification.extractModel(model.toMap, funDomains, typeDomains, evaluator)

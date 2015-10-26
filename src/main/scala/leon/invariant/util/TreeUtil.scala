@@ -138,7 +138,7 @@ object ProgramUtil {
         }
       }
       //copy annotations
-      from.flags.foreach(to.addFlag(_))
+      from.flags.foreach(to.addFlag)
     }
     val newprog = copyProgram(prog, (defs: Seq[Definition]) => defs.map {
       case fd: FunDef if funMap.contains(fd) =>

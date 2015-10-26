@@ -4,7 +4,7 @@ package leon
 package synthesis
 package rules
 
-import leon.utils.SeqUtils
+import leon.utils._
 import solvers._
 import grammars._
 
@@ -36,7 +36,7 @@ abstract class CEGISLike[T <% Typed](name: String) extends Rule(name) {
     val exSolverTo  = 2000L
     val cexSolverTo = 2000L
 
-    // Track non-deterministic programs up to 10'000 programs, or give up
+    // Track non-deterministic programs up to 100'000 programs, or give up
     val nProgramsLimit = 100000
 
     val sctx = hctx.sctx
@@ -249,8 +249,8 @@ abstract class CEGISLike[T <% Typed](name: String) extends Rule(name) {
           println(f"$c%-4s :=")
           for ((b, builder, cs) <- alts ) {
             val active = if (isBActive(b)) " " else "⨯"
-            val markS   = if (markedBs(b)) Console.GREEN else ""
-            val markE   = if (markedBs(b)) Console.RESET else ""
+            val markS  = if (markedBs(b)) Console.GREEN else ""
+            val markE  = if (markedBs(b)) Console.RESET else ""
 
             val ex = builder(cs.map(_.toVariable)).asString
 
@@ -284,7 +284,8 @@ abstract class CEGISLike[T <% Typed](name: String) extends Rule(name) {
 
           val body = if (activeAlts.nonEmpty) {
             activeAlts.init.foldLeft(exprOf(activeAlts.last)) {
-              case (e, alt) => IfExpr(alt._1.toVariable, exprOf(alt), e)
+              case (e, alt) =>
+                IfExpr(alt._1.toVariable, exprOf(alt), e)
             }
           } else {
             Error(c.getType, "Impossibru")
@@ -340,9 +341,10 @@ abstract class CEGISLike[T <% Typed](name: String) extends Rule(name) {
             val nfd = fd.duplicate()
 
             nfd.fullBody = postMap {
-              case src if src eq hctx.ci.source =>
+              case ch: Choose if ch eq hctx.ci.source =>
                 Some(outerSolution.term)
-
+              case c@ Conditionally(Seq(alt, alts@_*)) if c eq hctx.ci.source =>
+                Some(IfExpr(outerSolution.term, alt, Conditionally(alts)))
               case _ => None
             }(nfd.fullBody)
 
@@ -387,7 +389,6 @@ abstract class CEGISLike[T <% Typed](name: String) extends Rule(name) {
 
         //val evaluator  = new DualEvaluator(sctx.context, programCTree, CodeGenParams.default)
         val evaluator  = new DefaultEvaluator(sctx.context, programCTree)
-
         tester =
           { (ex: Example, bValues: Set[Identifier]) =>
             // TODO: Test output value as well

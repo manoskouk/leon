@@ -70,7 +70,7 @@ class DefaultTactic(vctx: VerificationContext) extends Tactic(vctx) {
 
     fd.body.toSeq.flatMap { body =>
       // We don't collect preconditions here, because these are handled by generatePreconditions
-      val calls = collectCorrectnessConditions(body, collectFIs = false)
+      val calls = collectCorrectnessConditions(body, collectPres = false)
 
       calls.map {
         case (e, correctnessCond) =>

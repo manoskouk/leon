@@ -524,9 +524,9 @@ trait AbstractZ3Solver extends Solver {
       case m @ FiniteMap(elems, from, to) =>
         val MapType(_, t) = normalizeType(m.getType)
 
-        rec(RawArrayValue(from, elems.map{
+        rec(RawArrayValue(from, elems.map {
           case (k, v) => (k, CaseClass(library.someType(t), Seq(v)))
-        }.toMap, CaseClass(library.noneType(t), Seq())))
+        }, CaseClass(library.noneType(t), Seq())))
 
       case MapApply(m, k) =>
         val mt @ MapType(_, t) = normalizeType(m.getType)
@@ -689,7 +689,7 @@ trait AbstractZ3Solver extends Solver {
                     val elems = r.elems.flatMap {
                       case (k, CaseClass(leonSome, Seq(x))) => Some(k -> x)
                       case (k, _) => None
-                    }.toMap
+                    }
 
                     FiniteMap(elems, from, to)
                 }

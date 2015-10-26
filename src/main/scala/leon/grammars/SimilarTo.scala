@@ -81,7 +81,7 @@ case class SimilarTo(e: Expr, terminals: Set[Expr] = Set(), sctx: SynthesisConte
         }
 
         val swaps = if (subs.size > 1 && !isCommutative(e)) {
-          (for (i <- 0 until subs.size;
+          (for (i <- subs.indices;
                j <- i+1 until subs.size) yield {
 
             if (subs(i).getType == subs(j).getType) {

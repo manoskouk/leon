@@ -1329,6 +1329,8 @@ object ExprOps {
     CollectorWithPaths(f).traverse(expr)
   }
 
+  def pcOf(e: Expr, within: Expr) = collectWithPC { case `e` => }(within).map(_._2).toList
+
   def patternSize(p: Pattern): Int = p match {
     case wp: WildcardPattern =>
       1
@@ -2148,13 +2150,14 @@ object ExprOps {
     * will not fail (e.g. by violating a function precondition or evaluating to an error).
     *
     * Collection of preconditions of function invocations can be disabled
-    * (mainly for [[leon.verification.Tactic]]).
+    * (mainly for [[leon.verification.Tactic.generateCorrectnessConditions]] vs.
+    * [[leon.verification.Tactic.generatePreconditions]]).
     *
     * @param e The expression for which correctness conditions are calculated.
-    * @param collectFIs Whether we also want to collect preconditions for function invocations
+    * @param collectPres Whether we also want to collect preconditions for function invocations
     * @return A sequence of pairs (expression, condition)
     */
-  def collectCorrectnessConditions(e: Expr, collectFIs: Boolean = true): Seq[(Expr, Expr)] = {
+  def collectCorrectnessConditions(e: Expr, collectPres: Boolean = true): Seq[(Expr, Expr)] = {
     val conds = collectWithPC {
 
       case m @ MatchExpr(scrut, cases) =>
@@ -2169,10 +2172,10 @@ object ExprOps {
       case e @ Ensuring(body, post) =>
         (e, application(post, Seq(body)))
 
-      case r @ Require(pred, e) =>
+      case r @ Require(pred, _) =>
         (r, pred)
 
-      case fi @ FunctionInvocation(tfd, args) if tfd.hasPrecondition && collectFIs =>
+      case fi @ FunctionInvocation(tfd, args) if tfd.hasPrecondition && collectPres =>
         (fi, tfd.withParamSubst(args, tfd.precondition.get))
     }(e)
 

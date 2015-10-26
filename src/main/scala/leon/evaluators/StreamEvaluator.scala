@@ -146,6 +146,9 @@ class StreamEvaluator(ctx: LeonContext, prog: Program)
       }
       cartesianProduct(mapping map solveOne) map (PartialLambda(_, tpe, df)) // FIXME!!!
 
+    case Conditionally(alts) =>
+      interleave(alts map e)
+
     case f @ Forall(fargs, TopLevelAnds(conjuncts)) =>
       Stream() // FIXME
       /*def solveOne(conj: Expr) = {

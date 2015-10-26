@@ -3,6 +3,8 @@
 package leon
 package synthesis
 
+import leon.purescala.Expressions.{Expr, Conditionally}
+import leon.synthesis.dsl.ConditionSynthesizer
 import purescala.ExprOps._
 
 import purescala.ScalaPrinter
@@ -94,6 +96,16 @@ object SynthesisPhase extends TransformationPhase {
         }
       }
     }
+
+    for {
+      fd <- program.definedFunctions
+      cond <- collect { case c: Conditionally => Set(c); case _ => Set[Conditionally]() }(fd.fullBody)
+    } {
+      val synth = new ConditionSynthesizer(ctx, program, cond, fd)
+      synth.solve()
+    }
+
+
 
     for (fd <- functions) {
       ctx.reporter.info(ASCIIHelpers.title(fd.id.name))

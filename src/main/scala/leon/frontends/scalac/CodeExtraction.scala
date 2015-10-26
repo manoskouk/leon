@@ -1320,6 +1320,9 @@ trait CodeExtraction extends ASTExtractors {
           val cBody = extractTree(body)
           Choose(cBody)
 
+        case ExConditionally(alts) =>
+          Conditionally(alts map extractTree)
+
         case l @ ExLambdaExpression(args, body) =>
           val vds = args map { vd =>
             val aTpe = extractType(vd.tpt)

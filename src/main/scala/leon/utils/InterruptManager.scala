@@ -10,6 +10,7 @@ import sun.misc.{Signal, SignalHandler}
 import java.util.WeakHashMap
 
 class InterruptManager(reporter: Reporter) extends Interruptible {
+  // We use WeakHashMap because we don't want this reference preventing solvers from being GC'd
   private[this] val interruptibles = new WeakHashMap[Interruptible, Boolean]()
   private[this] val sigINT = new Signal("INT")
 

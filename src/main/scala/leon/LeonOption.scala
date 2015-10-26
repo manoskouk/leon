@@ -65,7 +65,7 @@ class LeonOption[+A] private (val optionDef: LeonOptionDef[A], val value: A) {
       optionDef.name == this.optionDef.name && value == this.value
     case _ => false
   }
-  override def hashCode = optionDef.hashCode
+  override def hashCode = optionDef.hashCode + value.hashCode
 }
 
 object LeonOption {
@@ -80,7 +80,7 @@ object OptionParsers {
 
   val longParser: OptionParser[Long] = _.toLong
   val stringParser: OptionParser[String] = x => x
-  def booleanParser: OptionParser[Boolean] = {
+  val booleanParser: OptionParser[Boolean] = {
     case "on"  | "true"  | "yes" | "" => true
     case "off" | "false" | "no"       => false
     case _  => throw new IllegalArgumentException

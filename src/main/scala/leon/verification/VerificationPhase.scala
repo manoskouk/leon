@@ -164,10 +164,10 @@ object VerificationPhase extends SimpleLeonPhase[Program,VerificationReport] {
           VCResult(status, Some(s), Some(dt))
 
         case Some(false) =>
-          VCResult(VCStatus.Valid, s.getResultSolver, Some(dt))
+          VCResult(if (vc.checkSat) VCStatus.Unsat else VCStatus.Valid, s.getResultSolver, Some(dt))
 
         case Some(true) =>
-          VCResult(VCStatus.Invalid(s.getModel), s.getResultSolver, Some(dt))
+          VCResult(if (vc.checkSat) VCStatus.Valid else VCStatus.Invalid(s.getModel), s.getResultSolver, Some(dt))
       }
 
       reporter.synchronized {

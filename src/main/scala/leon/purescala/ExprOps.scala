@@ -2169,11 +2169,12 @@ object ExprOps {
       case e @ Ensuring(body, post) =>
         (e, application(post, Seq(body)))
 
-      case r @ Require(pred, e) =>
-        (r, pred)
-
       case fi @ FunctionInvocation(tfd, args) if tfd.hasPrecondition && collectFIs =>
         (fi, tfd.withParamSubst(args, tfd.precondition.get))
+
+      case ch @ Choose(pred) =>
+        val args = pred.getType.asInstanceOf[FunctionType].from.map(FreshIdentifier("x", _, alwaysShowUniqueID = true))
+        (ch, application(pred, args map Variable))
     }(e)
 
     conds map {

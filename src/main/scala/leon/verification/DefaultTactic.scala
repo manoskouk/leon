@@ -46,7 +46,8 @@ class DefaultTactic(vctx: VerificationContext) extends Tactic(vctx) {
     def eToVCKind(e: Expr) = e match {
       case _ : MatchExpr =>
         VCKinds.ExhaustiveMatch
-
+      case _ : Choose =>
+        VCKinds.ChooseSat
       case Assert(_, Some(err), _) =>
         if (err.startsWith("Map ")) {
           VCKinds.MapUsage

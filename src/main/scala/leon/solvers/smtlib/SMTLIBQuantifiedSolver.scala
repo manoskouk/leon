@@ -16,7 +16,7 @@ trait SMTLIBQuantifiedSolver {
   override def assertVC(vc: VC) = {
     dbg(s"; Solving $vc")
     currentFunDef = Some(vc.fd)
-    assertCnstr(withInductiveHyp(vc.condition))
+    assertCnstr(withInductiveHyp(vc.condition, vc.checkSat))
   }
 
   // Normally, UnrollingSolver tracks the input variable, but this one

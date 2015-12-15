@@ -14,6 +14,10 @@ case class VC(condition: Expr, fd: FunDef, kind: VCKind) extends Positioned {
   override def toString = {
     fd.id.name +" - " +kind.toString
   }
+  def checkSat = kind match {
+    case VCKinds.ChooseSat => true
+    case _ => false
+  }
 }
 
 abstract class VCKind(val name: String, val abbrv: String) {
@@ -37,6 +41,7 @@ object VCKinds {
   case object ModuloByZero    extends VCKind("modulo by zero", "mod 0")
   case object RemainderByZero extends VCKind("remainder by zero", "rem 0")
   case object CastError       extends VCKind("cast correctness", "cast")
+  case object ChooseSat       extends VCKind("choose satisfiable", "choose")
 }
 
 case class VCResult(status: VCStatus, solvedWith: Option[Solver], timeMs: Option[Long]) {
@@ -51,7 +56,8 @@ case class VCResult(status: VCStatus, solvedWith: Option[Solver], timeMs: Option
     status match {
       case VCStatus.Valid =>
         reporter.info(" => VALID")
-
+      case VCStatus.Unsat =>
+        reporter.warning(" => UNSAT")
       case VCStatus.Invalid(cex) =>
         reporter.warning(" => INVALID")
         reporter.warning("Found counter-example:")
@@ -92,4 +98,5 @@ object VCStatus {
   case object Unknown extends VCStatus("unknown")
   case object Timeout extends VCStatus("timeout")
   case object Cancelled extends VCStatus("cancelled")
+  case object Unsat extends VCStatus("unsat") // For VCs with checkSat == true
 }

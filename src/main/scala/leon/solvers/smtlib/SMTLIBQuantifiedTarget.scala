@@ -25,7 +25,7 @@ trait SMTLIBQuantifiedTarget extends SMTLIBTarget {
 
   protected val typedFunDefExplorationLimit = 10000
 
-  protected def withInductiveHyp(cond: Expr): Expr = {
+  protected def withInductiveHyp(cond: Expr, checkSat: Boolean): Expr = {
 
     val inductiveHyps = for {
       fi@FunctionInvocation(tfd, args) <- functionCallsOf(cond).toSeq
@@ -43,7 +43,9 @@ trait SMTLIBQuantifiedTarget extends SMTLIBTarget {
 
     // We want to check if the negation of the vc is sat under inductive hyp.
     // So we need to see if (indHyp /\ !vc) is satisfiable
-    liftLets(matchToIfThenElse(andJoin(inductiveHyps :+ not(cond))))
+    liftLets(matchToIfThenElse(andJoin(
+      inductiveHyps :+ (if (checkSat) cond else not(cond))
+    )))
 
   }
 }

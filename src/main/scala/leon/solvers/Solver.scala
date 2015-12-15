@@ -20,7 +20,10 @@ trait Solver extends Interruptible {
   def assertCnstr(expression: Expr): Unit
   def assertVC(vc: VC) = {
     dbg(s"; Solving $vc @ ${vc.getPos}\n")
-    assertCnstr(Not(vc.condition))
+    assertCnstr(
+      if(vc.checkSat) vc.condition
+      else Not(vc.condition)
+    )
   }
 
   def check: Option[Boolean]

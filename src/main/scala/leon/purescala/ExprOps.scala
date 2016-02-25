@@ -1429,10 +1429,6 @@ object ExprOps extends { val Deconstructor = Operator } with SubTreeOps[Expr] {
           idHomo(tfd1.fd.id, tfd2.fd.id) && tfd1.tps.zip(tfd2.tps).mergeall{ case (t1, t2) => if(t1 == t2) Option(Map()) else None} &&
           (args1 zip args2).mergeall{ case (a1, a2) => isHomo(a1, a2) }
 
-        case (Terminating(tfd1, args1), Terminating(tfd2, args2)) =>
-          idHomo(tfd1.fd.id, tfd2.fd.id) && tfd1.tps.zip(tfd2.tps).mergeall{ case (t1, t2) => if(t1 == t2) Option(Map()) else None} &&
-          (args1 zip args2).mergeall{ case (a1, a2) => isHomo(a1, a2) }
-
         case (Lambda(defs, body), Lambda(defs2, body2)) =>
           // We remove variables introduced by lambdas.
           (isHomo(body, body2) &&
@@ -1551,8 +1547,6 @@ object ExprOps extends { val Deconstructor = Operator } with SubTreeOps[Expr] {
 
       }
 
-      import synthesis.Witnesses.Terminating
-
       val res = (t1, t2) match {
         case (Variable(i1), Variable(i2)) =>
           idHomo(i1, i2)
@@ -1581,14 +1575,6 @@ object ExprOps extends { val Deconstructor = Operator } with SubTreeOps[Expr] {
           // TODO: Check type params
           fdHomo(tfd1.fd, tfd2.fd) &&
           (args1 zip args2).forall{ case (a1, a2) => isHomo(a1, a2) }
-
-        case (Terminating(tfd1, args1), Terminating(tfd2, args2)) =>
-          // TODO: Check type params
-          fdHomo(tfd1.fd, tfd2.fd) &&
-          (args1 zip args2).forall{ case (a1, a2) => isHomo(a1, a2) }
-
-        case (v1, v2) if isValue(v1) && isValue(v2) =>
-          v1 == v2
 
         case Same(Deconstructor(es1, _), Deconstructor(es2, _)) =>
           (es1.size == es2.size) &&
@@ -2043,7 +2029,6 @@ object ExprOps extends { val Deconstructor = Operator } with SubTreeOps[Expr] {
   def liftClosures(e: Expr): (Set[FunDef], Expr) = {
     var fds: Map[FunDef, FunDef] = Map()
 
-    import synthesis.Witnesses.Terminating
     val res1 = preMap({
       case LetDef(lfds, b) =>
         val nfds = lfds.map(fd => fd -> fd.duplicate())
@@ -2055,13 +2040,6 @@ object ExprOps extends { val Deconstructor = Operator } with SubTreeOps[Expr] {
       case FunctionInvocation(tfd, args) =>
         if (fds contains tfd.fd) {
           Some(FunctionInvocation(fds(tfd.fd).typed(tfd.tps), args))
-        } else {
-          None
-        }
-
-      case Terminating(tfd, args) =>
-        if (fds contains tfd.fd) {
-          Some(Terminating(fds(tfd.fd).typed(tfd.tps), args))
         } else {
           None
         }

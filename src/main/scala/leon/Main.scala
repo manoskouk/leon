@@ -101,11 +101,11 @@ object Main {
 
     val initReporter = new DefaultReporter(Set())
 
-    val options = args.filter(_.startsWith("--")).toSet
+    val options = args.filter(_.startsWith("--"))
 
     val files = args.filterNot(_.startsWith("-")).map(new java.io.File(_))
 
-    val leonOptions: Set[LeonOption[Any]] = options.map { opt =>
+    val leonOptions: Seq[LeonOption[Any]] = options.map { opt =>
       val (name, value) = try {
         OptionsHelpers.nameValue(opt)
       } catch {
@@ -138,7 +138,7 @@ object Main {
     LeonContext(
       reporter = reporter,
       files = files,
-      options = leonOptions.toSeq,
+      options = leonOptions,
       interruptManager = new InterruptManager(reporter)
     )
   }
@@ -219,7 +219,6 @@ object Main {
     // Process options
     val ctx = try {
       processOptions(argsl)
-
     } catch {
       case LeonFatalError(None) =>
         exit(error=true)

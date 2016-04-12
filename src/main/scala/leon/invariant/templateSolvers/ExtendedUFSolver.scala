@@ -3,9 +3,8 @@
 package leon
 package invariant.templateSolvers
 
-import z3.scala._
 import purescala.Definitions._
-import purescala.Expressions._
+import purescala.Expressions.{Expr => LeonExpr, _}
 import leon.solvers.z3.UninterpretedZ3Solver
 
 /**
@@ -21,30 +20,28 @@ class ExtendedUFSolver(context: LeonContext, program: Program)
   /**
    * This uses z3 methods to evaluate the model
    */
-  def evalExpr(expr: Expr): Option[Expr] = {
+  def evalExpr(expr: LeonExpr): Option[LeonExpr] = {
     val ast = toZ3Formula(expr)
     val model = solver.getModel
-    val res = model.eval(ast, true)
-    if (res.isDefined)
-      Some(fromZ3Formula(model, res.get, null))
-    else None
+    val res = model.eval(ast, true) // FIXME ???
+    Some(fromZ3Formula(model, res, null))
   }
 
-  def getAssertions: Expr = {
-    val assers = solver.getAssertions.map((ast) => fromZ3Formula(null, ast, null))
-    And(assers)
+  def getAssertions: LeonExpr = {
+    val asserts = solver.getAssertions.map((ast) => fromZ3Formula(null, ast, null))
+    And(asserts)
   }
 
   /**
    * Uses z3 to convert a formula to SMTLIB.
    */
   def ctrsToString(logic: String, unsatcore: Boolean = false): String = {
-    z3.setAstPrintMode(Z3Context.AstPrintMode.Z3_PRINT_SMTLIB2_COMPLIANT)
+    // FIXME z3.setAstPrintMode(Z3Context.AstPrintMode.Z3_PRINT_SMTLIB2_COMPLIANT)
     var seenHeaders = Set[String]()
     var headers = Seq[String]()
     var asserts = Seq[String]()
-    solver.getAssertions().toSeq.foreach((asser) => {
-      val str = z3.benchmarkToSMTLIBString("benchmark", logic, "unknown", "", Seq(), asser)
+    solver.getAssertions.toSeq.foreach((asser) => {
+      val str = z3.benchmarkToSMTString("benchmark", logic, "unknown", "", Array(), asser)
       //remove from the string the headers and also redeclaration of template variables
       //split based on newline to get a list of strings
       val strs = str.split("\n")

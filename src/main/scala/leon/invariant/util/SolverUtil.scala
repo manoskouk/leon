@@ -14,9 +14,6 @@ import leon.invariant.templateSolvers.ExtendedUFSolver
 import java.io._
 import Util._
 import PredicateUtil._
-import evaluators._
-import EvaluationResults._
-import purescala.Extractors._
 
 object SolverUtil {
 
@@ -32,10 +29,10 @@ object SolverUtil {
   def completeWithRefModel(currModel: Model, refModel: Model) = {
     new Model(refModel.toMap.map {
       case (id, _) if currModel.isDefinedAt(id) =>
-        (id -> currModel(id))
+        id -> currModel(id)
       case (id, v) =>
-        (id -> v)
-    }.toMap)
+        id -> v
+    })
   }
 
   def toZ3SMTLIB(expr: Expr, filename: String,
@@ -65,8 +62,8 @@ object SolverUtil {
    */
   def checkInvariant(expr: Expr, ctx: LeonContext, prog: Program): Option[Boolean] = {
     val idmap: Map[Expr, Expr] = variablesOf(expr).collect {
-      case id @ _ if (id.name.toString == "a?") => id.toVariable -> InfiniteIntegerLiteral(6)
-      case id @ _ if (id.name.toString == "c?") => id.toVariable -> InfiniteIntegerLiteral(2)
+      case id if id.name.toString == "a?" => id.toVariable -> InfiniteIntegerLiteral(6)
+      case id if id.name.toString == "c?" => id.toVariable -> InfiniteIntegerLiteral(2)
     }.toMap
     //println("found ids: " + idmap.keys)
     if (idmap.keys.nonEmpty) {
@@ -91,7 +88,7 @@ object SolverUtil {
     var newEqs = Map[Expr, Expr]()
     val solver = new ExtendedUFSolver(ctx, prog)
     val newe = simplePostTransform {
-      case e@(And(_) | Or(_)) => {
+      case e@(And(_) | Or(_)) =>
         val v = TVarFactory.createTempDefault("a", BooleanType).toVariable
         newEqs += (v -> e)
         val newe = Equals(v, e)
@@ -101,15 +98,15 @@ object SolverUtil {
         controlVars += (cvar -> newe)
         solver.assertCnstr(Or(newe, cvar))
         v
-      }
-      case e => e
+      case e =>
+        e
     }(ine)
     //create new variable and add it in disjunction
     val cvar = FreshIdentifier("ctrl", BooleanType, true).toVariable
     controlVars += (cvar -> newe)
     solver.assertCnstr(Or(newe, cvar))
 
-    val res = solver.checkAssumptions(controlVars.keySet.map(Not.apply _))
+    val res = solver.checkAssumptions(controlVars.keySet.map(e => Not(e): Expr))
     println("Result: " + res)
     val coreExprs = solver.getUnsatCore
     val simpcores = coreExprs.foldLeft(Seq[Expr]())((acc, coreExp) => {
@@ -118,10 +115,11 @@ object SolverUtil {
       //println("newexp: "+newexp)
       newexp match {
         // case Iff(v@Variable(_),rhs) if(newEqs.contains(v)) => acc
-        case Equals(v @ Variable(_), rhs) if (v.getType == BooleanType && rhs.getType == BooleanType && newEqs.contains(v)) => acc
-        case _ => {
+        case Equals(v @ Variable(_), rhs)
+            if v.getType == BooleanType && rhs.getType == BooleanType && newEqs.contains(v) =>
+          acc
+        case _ =>
           acc :+ newexp
-        }
       }
     })
     val cores = Util.fix((e: Expr) => replace(newEqs, e))(createAnd(simpcores.toSeq))

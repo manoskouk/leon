@@ -3,10 +3,10 @@
 package leon
 package solvers.z3
 
-import z3.scala._
+import com.microsoft.z3._
+
 import purescala.Common._
-import purescala.Expressions._
-import purescala.Constructors._
+import purescala.Expressions.{ Expr => LeonExpr, _}
 import purescala.ExprOps._
 import purescala.Types._
 
@@ -17,27 +17,16 @@ trait Z3ModelReconstruction {
 
   private final val AUTOCOMPLETEMODELS : Boolean = true
 
-  def modelValue(model: Z3Model, id: Identifier, tpe: TypeTree = null) : Option[Expr] = {
+  def modelValue(model: Model, id: Identifier, tpe: TypeTree = null) : Option[LeonExpr] = {
     val expectedType = if(tpe == null) id.getType else tpe
 
     variables.getB(id.toVariable).flatMap { z3ID =>
-      expectedType match {
-        case BooleanType => model.evalAs[Boolean](z3ID).map(BooleanLiteral)
-        case Int32Type =>
-          model.evalAs[Int](z3ID).map(IntLiteral).orElse{
-            model.eval(z3ID).flatMap(t => softFromZ3Formula(model, t, Int32Type))
-          }
-        case IntegerType => model.evalAs[Int](z3ID).map(InfiniteIntegerLiteral(_))
-        case other => model.eval(z3ID) match {
-          case None => None
-          case Some(t) => softFromZ3Formula(model, t, other)
-        }
-      }
+      softFromZ3Formula(model, model.eval(z3ID, true), expectedType) // FIXME ???
     }
   }
 
-  def modelToMap(model: Z3Model, ids: Iterable[Identifier]) : Map[Identifier,Expr] = {
-    var asMap = Map.empty[Identifier,Expr]
+  def modelToMap(model: Model, ids: Iterable[Identifier]) : Map[Identifier, LeonExpr] = {
+    var asMap = Map.empty[Identifier, LeonExpr]
 
     def completeID(id : Identifier) : Unit = {
       asMap = asMap + (id -> simplestValue(id.getType))
@@ -56,7 +45,7 @@ trait Z3ModelReconstruction {
     asMap
   }
 
-  def printExtractedModel(model: Z3Model, ids : Iterable[Identifier]) : Unit = {
+  def printExtractedModel(model: Model, ids : Iterable[Identifier]) : Unit = {
     reporter.info("Tentative extracted model")
     reporter.info("*************************")
     for(id <- ids) {

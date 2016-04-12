@@ -4,7 +4,6 @@ package leon
 package solvers
 
 import combinators._
-import unrolling._
 import z3._
 import cvc4._
 import smtlib._
@@ -171,10 +170,11 @@ object SolverFactory {
   }
 
   lazy val hasNativeZ3 = try {
-    new _root_.z3.scala.Z3Config
+    new com.microsoft.z3.Context()
     true
   } catch {
-    case _: java.lang.UnsatisfiedLinkError =>
+    case _: java.lang.UnsatisfiedLinkError
+       | _: java.lang.UnsupportedClassVersionError =>
       false
   }
 

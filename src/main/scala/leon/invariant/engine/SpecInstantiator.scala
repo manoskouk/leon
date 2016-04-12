@@ -2,24 +2,15 @@
 
 package leon
 package invariant.engine
-import z3.scala._
+
 import purescala.Common._
 import purescala.Definitions._
 import purescala.Expressions._
 import purescala.ExprOps._
 import leon.purescala.TypeOps.instantiateType
-import purescala.Extractors._
-import purescala.Types._
-import java.io._
 import leon.invariant.templateSolvers.ExtendedUFSolver
-import invariant._
-import scala.util.control.Breaks._
-import solvers._
-import scala.concurrent._
-import scala.concurrent.duration._
 import leon.evaluators.DefaultEvaluator
 
-import invariant.templateSolvers._
 import invariant.factories._
 import invariant.util._
 import invariant.structure._
@@ -27,7 +18,6 @@ import FunctionUtils._
 import Util._
 import PredicateUtil._
 import ProgramUtil._
-import SolverUtil._
 
 class SpecInstantiator(ctx: InferenceContext, program: Program, ctrTracker: ConstraintTracker) {
 

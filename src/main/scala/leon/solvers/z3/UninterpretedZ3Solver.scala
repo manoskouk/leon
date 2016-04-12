@@ -3,15 +3,12 @@
 package leon
 package solvers.z3
 
-import z3.scala._
-
-import leon.solvers._
+import leon.solvers.Model
 import utils.IncrementalSet
 
 import purescala.Common._
 import purescala.Definitions._
 import purescala.Expressions._
-import purescala.Extractors._
 import purescala.ExprOps._
 import purescala.Types._
 
@@ -43,22 +40,22 @@ class UninterpretedZ3Solver(val context : LeonContext, val program: Program)
 
   def assertCnstr(expression: Expr) {
     freeVariables ++= variablesOf(expression)
-    solver.assertCnstr(toZ3Formula(expression))
+    solver.add(toZ3Formula(expression))
   }
 
   override def check: Option[Boolean] = solver.check()
 
   override def checkAssumptions(assumptions: Set[Expr]): Option[Boolean] = {
     freeVariables ++= assumptions.flatMap(variablesOf)
-    solver.checkAssumptions(assumptions.toSeq.map(toZ3Formula(_)) : _*)
+    solver.check(assumptions.toSeq.map(toZ3Formula(_)) : _*)
   }
 
   def getModel = {
-    new Model(modelToMap(solver.getModel(), freeVariables.toSet))
+    new Model(modelToMap(solver.getModel, freeVariables.toSet))
   }
 
   def getUnsatCore = {
-    solver.getUnsatCore().map(ast => fromZ3Formula(null, ast, BooleanType) match {
+    solver.getUnsatCore.map(ast => fromZ3Formula(null, ast, BooleanType) match {
       case n @ Not(Variable(_)) => n
       case v @ Variable(_) => v
       case x => scala.sys.error("Impossible element extracted from core: " + ast + " (as Leon tree : " + x + ")")

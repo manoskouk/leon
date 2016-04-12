@@ -1,7 +1,6 @@
 package leon
 package invariant.templateSolvers
 
-import z3.scala._
 import purescala.Common._
 import purescala.Definitions._
 import purescala.Expressions._

@@ -141,7 +141,7 @@ trait GenTreeOps[SubTree <: Tree]  {
   /** Post-transformation of the tree.
     *
     * Takes a partial function of replacements.
-    * Substitutes '''after''' recursing down the trees.
+    * Substitutes '''after''' recurring down the trees.
     *
     * Supports two modes :
     *

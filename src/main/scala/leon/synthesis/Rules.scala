@@ -56,6 +56,7 @@ object Rules {
     InequalitySplit,
     rules.Assert,
     SimplifySpec,
+    Abduction,
     DetupleInput,
     ADTSplit,
     InnerCaseSplit

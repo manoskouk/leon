@@ -63,7 +63,7 @@ object Common {
     def toVariable: Variable = Variable(this)
 
     def freshen: Identifier = FreshIdentifier(name, tpe, alwaysShowUniqueID).copiedFrom(this)
-    
+
     def duplicate(name: String = name, tpe: TypeTree = tpe, alwaysShowUniqueID: Boolean = alwaysShowUniqueID) = {
       FreshIdentifier(name, tpe, alwaysShowUniqueID)
     }

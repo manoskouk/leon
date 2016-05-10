@@ -24,7 +24,7 @@ class SearchContext (
 
   def searchDepth = {
     def depthOf(n: Node): Int = n.parent match {
-      case Some(n2) => 1+depthOf(n2)
+      case Some(n2) => 1 + depthOf(n2)
       case None     => 0
     }
 

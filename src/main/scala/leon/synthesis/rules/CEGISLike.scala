@@ -754,7 +754,7 @@ abstract class CEGISLike(name: String) extends Rule(name) {
                   warning("Solver could not solve path-condition")
                 }
                 Nil
-                //return RuleFailed() // This is not necessary though, but probably wanted
+                //return RuleFailed() // Maybe we want this? It might fail some hard benchmarks
             }
           } finally {
             solverf.reclaim(solver)

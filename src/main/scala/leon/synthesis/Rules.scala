@@ -55,6 +55,7 @@ object Rules {
     GenericTypeEqualitySplit,
     InequalitySplit,
     rules.Assert,
+    SimplifySpec,
     DetupleInput,
     ADTSplit,
     InnerCaseSplit

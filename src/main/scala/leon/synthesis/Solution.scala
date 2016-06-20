@@ -94,4 +94,8 @@ object Solution {
     val tpe = tupleTypeWrap(p.xs.map(_.getType))
     Solution(BooleanLiteral(false), Set(), Error(tpe, "Spec is UNSAT for this path!"))
   }
+
+  def unreachable(implicit p: Problem) = {
+    Solution(BooleanLiteral(true), Set(), Error(p.outType, "Unreachable code!"), isTrusted = true)
+  }
 }

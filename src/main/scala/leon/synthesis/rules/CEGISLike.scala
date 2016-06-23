@@ -12,6 +12,7 @@ import purescala.ExprOps._
 import purescala.TypeOps.depth
 import purescala.DefOps._
 import purescala.Constructors._
+import purescala.Extractors.unwrapTupleType
 
 import utils.MutableExpr
 import solvers._
@@ -66,7 +67,7 @@ abstract class CEGISLike(name: String) extends Rule(name) {
     }
 
     // Represents a non-deterministic program
-    object NonDeterministicProgram {
+    class NonDeterministicProgram {
 
       // Current synthesized term size
       private var termSize = 0
@@ -718,11 +719,35 @@ abstract class CEGISLike(name: String) extends Rule(name) {
       }
     }
 
+    locally {
+      // If we somehow are inside a function call of the function we are synthesizing, fail
+      val dummies = unwrapTupleType(p.outType, p.outType.isInstanceOf[TupleType]) map (tp => Variable(FreshIdentifier("dummy", tp, true)))
+      val dummy = tupleWrap(dummies)
+
+      val ps = new PartialSolution(hctx.search.strat, true)
+        .solutionAround(hctx.currentNode)(dummy)
+        .getOrElse(fatalError("Unable to get outer solution"))
+        .toSimplifiedExpr(hctx, hctx.program, p.pc)
+
+      val fb = replace(
+        Map(hctx.source -> ps),
+        hctx.functionContext.body.get
+      )
+      functionCallsOf(fb) foreach {
+        case FunctionInvocation(tfd, args) =>
+          println(args)
+          if ((args.toSet & dummies.toSet).nonEmpty && tfd.fd == hctx.functionContext) {
+            hctx.reporter.debug("CEGIS is not applicable within a recursive function call")
+            return Nil
+          }
+      }
+    }
+
     List(new RuleInstantiation(this.name) {
       def apply(hctx: SearchContext): RuleApplication = {
         var result: Option[RuleApplication] = None
 
-        val ndProgram = NonDeterministicProgram
+        val ndProgram = new NonDeterministicProgram
         ndProgram.init()
 
         implicit val ic = hctx
@@ -788,7 +813,7 @@ abstract class CEGISLike(name: String) extends Rule(name) {
             } else {
               val evaluator = new DualEvaluator(hctx, hctx.program)
               new GrammarDataGen(evaluator, ValueGrammar).generateFor(p.as, p.pc.toClause, nTests, 1000).map(InExample)
-        }
+            }
           }
         }
 

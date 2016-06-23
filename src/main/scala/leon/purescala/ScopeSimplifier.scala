@@ -28,9 +28,9 @@ class ScopeSimplifier extends Transformer {
   }
 
   protected def genId(id: Identifier, scope: Scope): Identifier = {
-    val existCount = scope.inScope.count(_.name == id.name)
+    val existCount = scope.inScope.count(_.name == id.name) + 1 // Start with 1 to avoid aliases
 
-    FreshIdentifier.forceId(id.name, existCount, id.getType, existCount >= 1)
+    FreshIdentifier.forceId(id.name, existCount, id.getType, alwaysShowUniqueID = true)
   }
 
   protected def rec(e: Expr, scope: Scope): Expr = e match {

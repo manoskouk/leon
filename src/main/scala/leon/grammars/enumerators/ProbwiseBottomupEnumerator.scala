@@ -4,9 +4,10 @@ package leon
 package grammars
 package enumerators
 
-import purescala.Common.Identifier
+import purescala.Common.{FreshIdentifier, Identifier}
 import purescala.Definitions.Program
-import purescala.Expressions.Expr
+import purescala.TypeOps.typeCardinality
+import purescala.Expressions.{Variable, Expr}
 import evaluators.TableEvaluator
 import synthesis.Example
 import scala.annotation.tailrec
@@ -21,6 +22,12 @@ import scala.collection.{mutable => mut}
   * @tparam R The type of enumerated elements.
   */
 abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (ProductionRule[NT, R], Seq[ProductionRule[NT, R]])]){
+
+  private var indent = 0
+  protected def d(s: Any) = {
+    val lines = s.toString.lines
+    lines foreach (l => println("  " * indent + l))
+  }
 
   protected val ctx: LeonContext
   protected type Rule = ProductionRule[NT, R]
@@ -81,6 +88,9 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
         .withDefaultValue(mut.HashSet[FrontierElem]())
     )
 
+    val theRule = rule.asInstanceOf[ProductionRule[Label, Expr]]
+    val toPrint = true //theRule.builder(theRule.subTrees.map(l => Variable(FreshIdentifier("x", l.tpe)))).getType == IntegerType
+
     @inline private def dominates(e1: FrontierElem, e2: FrontierElem) =
       e1.coordinates zip e2.coordinates forall ((_: Int) <= (_: Int)).tupled
 
@@ -96,7 +106,7 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
           val coord = elem.coordinates(i)
           byDim(i)(coord) += elem
         }
-      }
+      }// else if (toPrint) d("REJECTED")
     }
 
     // Add an element suspension to the frontier
@@ -222,13 +232,20 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
           operators(nt).map(_.getNext).max match {
             case Success((elem, op)) =>
               op.advance()
+              d(s"Try ${elem.r}")
               if (isDistinct(elem, hashSet)) {
+                d("OK!")
                 buffer += elem
                 Success(elem)
-              } else rec
+              } else {
+                d("Subsumed!")
+                rec
+              }
             case Suspended =>
+              d(s"$nt suspended!")
               Suspended
             case Depleted =>
+              d(s"$nt depleted!")
               depleted = true
               Depleted
             //println(s"$nt: Adding ($r, $d)")
@@ -244,7 +261,11 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
     @inline def get(i: Int): TryNext[StreamElem] = {
       if (i == buffer.size) populateNext()
       else if (i > buffer.size) sys.error("Whoot?")
-      else Success(buffer(i))
+      else {
+        d(s"${nt.asInstanceOf[Label].tpe}.$i")
+        d("Already there")
+        Success(buffer(i))
+      }
     }
 
     def iterator: Iterator[R] = new Iterator[R] {
@@ -264,9 +285,24 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
     private val arity = rule.arity
     private val typedStreams = rule.subTrees.map(streams)
     private val frontier: Frontier = new Frontier(arity, rule, typedStreams)
+    private val theRule = rule.asInstanceOf[ProductionRule[Label, Expr]]
+    private val s = theRule.builder(theRule.subTrees.map(l => Variable(FreshIdentifier("x", l.tpe))))
 
     @inline def getNext: TryNext[(StreamElem, OperatorStream)] = {
-      frontier.tryHead.map(fe => (fe.streamElem, this))
+      d(s"Op $s")
+      indent += 1
+
+      frontier.tryHead match {
+        case f@(Suspended|Depleted) =>
+          indent -= 1
+          d(f)
+          f.asInstanceOf[TryNext[Nothing]]
+        case s@Success(fe) =>
+          indent -= 1
+          d(s"Found ${fe.coordinates}")
+          Success((fe.streamElem, this))
+      }
+
     }
 
     // Remove the top element of the frontier and add its derivatives
@@ -325,7 +361,11 @@ class EqClassesEnumerator( protected val grammar: ExpressionGrammar,
   }
 
   protected def isDistinct(elem: StreamElem, previous: mut.HashSet[Sig]): Boolean = {
-    previous.add(elem.sig)
+    //d(s"previous: ${previous}")
+    //d(s"sig: ${elem.sig}")
+    val res  = previous.add(elem.sig)
+    //d(s"res: $res")
+    res
   }
 
 }

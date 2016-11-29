@@ -7,8 +7,9 @@ package enumerators
 import purescala.Common.Identifier
 import purescala.Definitions.Program
 import purescala.Expressions.Expr
-import evaluators.{TableEvaluator, DefaultEvaluator}
+import evaluators.TableEvaluator
 import synthesis.Example
+import scala.annotation.tailrec
 import scala.collection.{mutable => mut}
 
 /** An enumerator that jointly enumerates elements from a number of production rules by employing a bottom-up strategy.
@@ -36,7 +37,35 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
     lazy val sig = mkSig(this)
   }
 
+  protected val applyTagOpt = true
   protected def isDistinct(elem: StreamElem, previous: mut.HashSet[Sig]): Boolean
+
+  trait TryNext[+A] {
+    def map[B](f: A => B): TryNext[B] = this match {
+      case Success(e) => Success(f(e))
+      case other => other.asInstanceOf[TryNext[B]]
+    }
+    def get: A = throw new UnsupportedOperationException("TryNext.get")
+    def isSuccess = false
+  }
+  case class Success[A](e: A) extends TryNext[A] {
+    override def get = e
+    override def isSuccess = true
+  }
+  case object Depleted extends TryNext[Nothing]
+  case object Suspended extends TryNext[Nothing]
+
+  def tnOrdering[A](implicit sub: Ordering[A]) = new Ordering[TryNext[A]] {
+    def compare(x: TryNext[A], y: TryNext[A]): Int = (x, y) match {
+      case (Success(elem1), Success(elem2)) => sub.compare(elem1, elem2)
+      case (Success(_), _) => 1
+      case (_, Success(_)) => -1
+      case (Depleted,  Suspended) => -1
+      case (Suspended, Depleted ) => 1
+      case _ => 0
+    }
+  }
+
 
   // Represents the frontier of an operator, i.e. a set of the most probable combinations of operand indexes
   // such that each other combination that has not been generated yet has an index >= than one element of the frontier
@@ -44,7 +73,7 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
   class Frontier(dim: Int, rule: Rule, streams: Seq[NonTerminalStream]) {
     private val ordering = Ordering.by[FrontierElem, Double](_.streamElem.logProb)
     private val queue = new mut.PriorityQueue[FrontierElem]()(ordering)
-    private var futureElems = List.empty[ElemSuspension]
+    private var futureElems = List.empty[FutureElem]
 
     private val byDim = Array.fill(dim)(
      mut.HashMap[Int, mut.HashSet[FrontierElem]]()
@@ -70,32 +99,37 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
     }
 
     // Add an element suspension to the frontier
-    @inline def +=(l: ElemSuspension) = {
+    @inline def +=(l: FutureElem) = {
       futureElems ::= l
     }
 
     // Calculate an element from a suspension by retrieving elements from the respective nonterminal streams
-    @inline private def elem(le: ElemSuspension): Option[(FrontierElem, Int)] = try {
+    @inline private def elem(le: FutureElem): TryNext[(FrontierElem, Int)] = {
       val children = le.coordinates.zip(streams).map { case (index, stream) => stream.get(index) }
-      if (children.map(_.rule.tag).zipWithIndex exists { case (t, ind) =>
-        Tags.excludedTags((rule.tag, ind)) contains t
-      })
-        None
-      else
-        Some(FrontierElem(le.coordinates, StreamElem(rule, children)), le.grownIndex)
-    } catch {
-      case _: IndexOutOfBoundsException =>
-        // Thrown by stream.get: A stream has been depleted
-        None
+      if (children contains Depleted) Depleted
+      else if (children contains Suspended) Suspended
+      else {
+        val operands = children.map(_.get)
+        if (applyTagOpt && operands.map(_.rule.tag).zipWithIndex.exists { case (t, ind) =>
+          Tags.excludedTags((rule.tag, ind)) contains t
+        })
+          Depleted
+        else
+          Success(FrontierElem(le.coordinates, StreamElem(rule, operands)), le.grownIndex)
+      }
     }
 
     // promote all elements suspensions to frontier elements
     private def promote() = {
-      for {
-        fe <- futureElems.reverse
-        (elem, index) <- elem(fe)
-      } enqueue(elem, index)
-      futureElems = Nil
+      def filter(fe: FutureElem) = elem(fe) match {
+        case Depleted => false
+        case Suspended => true
+        case Success((elem, index)) =>
+          enqueue(elem, index)
+          false
+      }
+
+      futureElems = futureElems.reverse.filter(filter).reverse
       // if (dim > 0) println(f"dim: $dim: 0: ${byDim(0)(0).map(_.coordinates(0)).max}%5d #: ${queue.size}%3d")
     }
 
@@ -107,21 +141,25 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
       res
     }
 
-    @inline def headOption = {
+    def tryHead: TryNext[FrontierElem] = {
       promote()
-      queue.headOption
+      queue.headOption match {
+        case Some(elem) => Success(elem)
+        case None =>
+          if (futureElems.isEmpty) Depleted else Suspended
+      }
     }
 
     @inline def isEmpty = queue.isEmpty && futureElems.isEmpty
   }
 
   /** A suspension of a frontier element (which has not yet retrieved its operands) */
-  protected case class ElemSuspension(coordinates: List[Int], grownIndex: Int)
+  protected case class FutureElem(coordinates: List[Int], grownIndex: Int)
 
   /** An element of the frontier */
   protected case class FrontierElem(coordinates: List[Int], streamElem: StreamElem) {
     def nextElems = coordinates.zipWithIndex.map {
-      case (elem, updated) => ElemSuspension(coordinates.updated(updated, elem + 1), updated)
+      case (elem, updated) => FutureElem(coordinates.updated(updated, elem + 1), updated)
     }
   }
 
@@ -155,42 +193,58 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
     initialize()
 
     private var lock = false
+    private var depleted = false
+
+    val pairOrd = new Ordering[(StreamElem, OperatorStream)] {
+      def compare(x: (StreamElem, OperatorStream), y: (StreamElem, OperatorStream)): Int = {
+        val doubleOrd = implicitly[Ordering[Double]]
+        doubleOrd.compare(x._1.logProb, y._1.logProb)
+      }
+    }
+
+    implicit val ord = tnOrdering(pairOrd)
 
     // Add a new element to the buffer
-    private def populateNext() = !lock && {
-      try {
+    private def populateNext() = {
+      if (depleted) Depleted
+      else if (lock) Suspended
+      else {
         lock = true
-        var found = false
-        while (!found) {
+        @tailrec def rec: TryNext[StreamElem] = {
           //println(s"$nt: size is ${buffer.size}, populating")
-          val (elem, op) = operators(nt).flatMap(_.getNext).maxBy(_._1.logProb) // FIXME Make this more efficient?
-          timers.advance.timed { op.advance() }
-          if (timers.distinct.timed { isDistinct(elem, hashSet) }) {
-            found = true
-            buffer += elem
+          operators(nt).map(_.getNext).max match {
+            case Success((elem, op)) =>
+              op.advance()
+              if (isDistinct(elem, hashSet)) {
+                buffer += elem
+                Success(elem)
+              } else rec
+            case Suspended =>
+              Suspended
+            case Depleted =>
+              depleted = true
+              Depleted
+            //println(s"$nt: Adding ($r, $d)")
           }
-          //println(s"$nt: Adding ($r, $d)")
         }
+        val res = rec
         lock = false
-      } catch {
-        case _: UnsupportedOperationException =>
-          // maxBy was called on an empty list, i.e. all operators have been depleted
-          // leave lock at true
+        res
       }
-      !lock
     }
 
     // Get the i-th element of the buffer
-    @inline def get(i: Int): StreamElem = {
+    @inline def get(i: Int): TryNext[StreamElem] = {
       if (i == buffer.size) populateNext()
-      buffer(i)
+      else if (i > buffer.size) sys.error("Whoot?")
+      else Success(buffer(i))
     }
 
     def iterator: Iterator[R] = new Iterator[R] {
       var i = 0
-      def hasNext = i < buffer.size || i == buffer.size && populateNext()
+      def hasNext = get(i).isSuccess
       def next = {
-        val res = get(i).r
+        val res = get(i).get.r
         i += 1
         res
       }
@@ -204,8 +258,8 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
     private val typedStreams = rule.subTrees.map(streams)
     private val frontier: Frontier = new Frontier(arity, rule, typedStreams)
 
-    @inline def getNext: Option[(StreamElem, OperatorStream)] = {
-      frontier.headOption.map(fe => (fe.streamElem, this))
+    @inline def getNext: TryNext[(StreamElem, OperatorStream)] = {
+      frontier.tryHead.map(fe => (fe.streamElem, this))
     }
 
     // Remove the top element of the frontier and add its derivatives
@@ -214,7 +268,7 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
     }
 
     private def init(): Unit = {
-      frontier += ElemSuspension(List.fill(arity)(0), -1)
+      frontier += FutureElem(List.fill(arity)(0), -1)
       if (isAdvanced) advance()
     }
     init()
@@ -242,8 +296,7 @@ class EqClassesEnumerator( protected val grammar: ExpressionGrammar,
   extends AbstractProbwiseBottomupEnumerator(ProbwiseBottomupEnumerator.productive(grammar, init))
   with GrammarEnumerator
 {
-  protected lazy val evaluator = //new DefaultEvaluator(ctx, program)
-                                 new TableEvaluator(ctx, program)
+  protected lazy val evaluator = new TableEvaluator(ctx, program)
   protected type Sig = Option[Seq[Expr]]
 
   protected def mkSig(elem: StreamElem): Sig = {

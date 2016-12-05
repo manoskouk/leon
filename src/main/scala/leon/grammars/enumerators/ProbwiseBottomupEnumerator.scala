@@ -38,6 +38,7 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
   }
 
   protected val applyTagOpt = true
+  protected val budget = -500.0
   protected def isDistinct(elem: StreamElem, previous: mut.HashSet[Sig]): Boolean
 
   trait TryNext[+A] {
@@ -114,8 +115,12 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
           Tags.excludedTags((rule.tag, ind)) contains t
         })
           Depleted
-        else
-          Success(FrontierElem(le.coordinates, StreamElem(rule, operands)), le.grownIndex)
+        else {
+          val se = StreamElem(rule, operands)
+          if (se.logProb >= budget)
+            Success(FrontierElem(le.coordinates, se), le.grownIndex)
+          else Depleted
+        }
       }
     }
 
@@ -133,8 +138,9 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
       // if (dim > 0) println(f"dim: $dim: 0: ${byDim(0)(0).map(_.coordinates(0)).max}%5d #: ${queue.size}%3d")
     }
 
+    // This should only be called after tryHead!
     def dequeue() = {
-      promote()
+      assume(queue.nonEmpty)
       val res = queue.dequeue()
       for (i <- 0 until dim)
         byDim(i)(res.coordinates(i)) -= res
@@ -150,7 +156,8 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
       }
     }
 
-    @inline def isEmpty = queue.isEmpty && futureElems.isEmpty
+    // This should only be called after tryHead!
+    @inline def isEmpty = queue.isEmpty
   }
 
   /** A suspension of a frontier element (which has not yet retrieved its operands) */

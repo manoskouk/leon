@@ -6,7 +6,6 @@ package enumerators
 
 import purescala.Common.{FreshIdentifier, Identifier}
 import purescala.Definitions.Program
-import purescala.TypeOps.typeCardinality
 import purescala.Expressions.{Variable, Expr}
 import evaluators.TableEvaluator
 import synthesis.Example
@@ -45,7 +44,7 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
   }
 
   protected val applyTagOpt = true
-  protected val budget = -500.0
+  protected val budget = -10.0
   protected def isDistinct(elem: StreamElem, previous: mut.HashSet[Sig]): Boolean
 
   trait TryNext[+A] {
@@ -129,7 +128,10 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
           val se = StreamElem(rule, operands)
           if (se.logProb >= budget)
             Success(FrontierElem(le.coordinates, se), le.grownIndex)
-          else Depleted
+          else {
+            d(s"Hit budget with ${se.r}")
+            Depleted
+          }
         }
       }
     }
@@ -223,16 +225,24 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
 
     // Add a new element to the buffer
     private def populateNext() = {
-      if (depleted) Depleted
-      else if (lock) Suspended
+      d(s"${nt.asInstanceOf[Label].tpe}.${buffer.size}")
+      if (depleted) {
+        d("DEPLETED")
+        Depleted
+      }
+      else if (lock) {
+        d("LOCK")
+        Suspended
+      }
       else {
+        indent += 1
         lock = true
         @tailrec def rec: TryNext[StreamElem] = {
           //println(s"$nt: size is ${buffer.size}, populating")
           operators(nt).map(_.getNext).max match {
             case Success((elem, op)) =>
               op.advance()
-              d(s"Try ${elem.r}")
+              d(s"Try ${elem.r} (${elem.logProb})")
               if (isDistinct(elem, hashSet)) {
                 d("OK!")
                 buffer += elem
@@ -252,6 +262,7 @@ abstract class AbstractProbwiseBottomupEnumerator[NT, R](nts: Map[NT, (Productio
           }
         }
         val res = rec
+        indent -= 1
         lock = false
         res
       }

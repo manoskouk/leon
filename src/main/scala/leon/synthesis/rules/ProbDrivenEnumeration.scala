@@ -216,6 +216,7 @@ object ProbDrivenEnumeration extends Rule("Prob. driven enumeration"){
       else {
         Stream.continually {
           val expr = it.next
+          println(s"Testing $expr")
           debug(s"Testing $expr")
           if (examples.exists(testCandidate(expr)(_).contains(false))) {
             None

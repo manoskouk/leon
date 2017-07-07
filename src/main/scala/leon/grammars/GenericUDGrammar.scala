@@ -197,8 +197,7 @@ case class GenericUDGrammar(program: Program, visibleFrom: Option[Definition], i
   // Maybe abstract over it?
   def parseClassName(cname: String): Option[(String, Int)] = {
     val chunks = cname.split("_")
-    if (chunks.last.contains("TOPLEVEL"))
-      None
+    if (chunks.last.contains("TOPLEVEL")) None
     else Some((chunks.last, chunks.init.last.toInt))
     //Some((cname, 0))
   }

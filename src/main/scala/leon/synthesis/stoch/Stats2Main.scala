@@ -18,6 +18,7 @@ object Stats2Main {
     println(LocalDateTime.now())
     println(s"SELECT_FUNCTION_TYPES: ${StatsMain.SELECT_FUNCTION_TYPES}")
     println(s"SELECT_TUPLE_TYPES: ${StatsMain.SELECT_TUPLE_TYPES}")
+    println(s"REPAIR: $REPAIR")
 
     val frontend = ClassgenPhase andThen
       ExtractionPhase andThen
@@ -47,7 +48,7 @@ object Stats2Main {
 
     val (_, bigProgram) = frontend.run(ctx, corpus :+ canaryFileName)
 
-    if (!REPAIR) new File("tmp-corpus").delete()
+    new File("tmp-corpus").delete()
 
     val canaryModule = bigProgram.units.find(u => args(1).contains(u.id.name)).get.modules.head
 

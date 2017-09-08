@@ -10,6 +10,7 @@ import leon.lang._
 import leon.lang.synthesis._
 import leon.math._
 import annotation.grammar._
+import numerical.Numerical._
 
 object GrammarNumerical {
   @label

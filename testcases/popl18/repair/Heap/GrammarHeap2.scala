@@ -7,11 +7,11 @@ import leon.collection.ListSpecs._
 import leon.lang.Set._
 import leon.lang._
 import leon.lang._
-import leon.lang.synthesis._
-import leon.math._
+//import leon.lang.synthesis._
+//import leon.math._
 import annotation.grammar._
-
-object grammar {
+import heap.Heaps._
+object GrammarHeap {
   @label
   implicit class BigInt_List_TOPLEVEL(val v : List[BigInt])
   

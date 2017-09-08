@@ -19,7 +19,7 @@ echo "#           Category,                 File,             function, p.S, fuS
 #All benchmarks:
 
 function run {
-  cmd="./leon --debug=report --timeout=60 --repair --introreccalls=off --solvers=fairz3,enum --mode=probwise --userdefined testcases/popl18/Grammar1Tags.scala --functions=$1 $2 $3"
+  cmd="./leon --debug=report --timeout=90 --repair --introreccalls=off --solvers=fairz3,enum --mode=probwise --userdefined testcases/popl18/Grammar1Tags.scala --functions=$1 $2 $3"
   echo "Running " $cmd
   echo "------------------------------------------------------------------------------------------------------------------"
   $cmd | tee -a $fullLog
@@ -33,6 +33,8 @@ run desugar  testcases/popl18/repair/Compiler/GrammarCompiler1.scala testcases/p
 run desugar  testcases/popl18/repair/Compiler/GrammarCompiler1.scala testcases/popl18/repair/Compiler/Compiler4.scala   
 run desugar  testcases/popl18/repair/Compiler/GrammarCompiler1.scala testcases/popl18/repair/Compiler/Compiler5.scala   
 run simplify testcases/popl18/repair/Compiler/GrammarCompiler1.scala testcases/popl18/repair/Compiler/Compiler6.scala   
+# NEW
+run semUntyped testcases/popl18/repair/Compiler/GrammarCompiler1.scala testcases/popl18/repair/Compiler/Compiler7.scala
 
 run merge    testcases/popl18/repair/Heap/GrammarHeap1.scala testcases/popl18/repair/Heap/Heap3.scala
 run merge    testcases/popl18/repair/Heap/GrammarHeap1.scala testcases/popl18/repair/Heap/Heap4.scala
@@ -56,6 +58,9 @@ run sum      testcases/popl18/repair/List/GrammarList1.scala testcases/popl18/re
 run -        testcases/popl18/repair/List/GrammarList1.scala testcases/popl18/repair/List/List12.scala          
 run drop     testcases/popl18/repair/List/GrammarList1.scala testcases/popl18/repair/List/List4.scala           
 run drop     testcases/popl18/repair/List/GrammarList1.scala testcases/popl18/repair/List/List13.scala          
+#NEW
+run '&'      testcases/popl18/repair/List/GrammarList1.scala testcases/popl18/repair/List/List14.scala          
+run count    testcases/popl18/repair/List/GrammarList1.scala testcases/popl18/repair/List/List15.scala          
 
 run power    testcases/popl18/repair/Numerical/GrammarNumerical1.scala testcases/popl18/repair/Numerical/Numerical1.scala 
 run moddiv   testcases/popl18/repair/Numerical/GrammarNumerical1.scala testcases/popl18/repair/Numerical/Numerical3.scala 

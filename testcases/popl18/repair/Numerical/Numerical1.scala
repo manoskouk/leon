@@ -1,4 +1,5 @@
 /* Copyright 2009-2015 EPFL, Lausanne */
+package numerical
 
 import leon._
 import leon.lang._

@@ -19,7 +19,7 @@ package object grammars {
     if (sctx.settings.steUserDefinedGrammar) {
       val recCalls = {
         if (sctx.findOptionOrDefault(SynthesisPhase.optIntroRecCalls)) Empty()
-        else SafeRecursiveCalls(sctx.program, p.ws, p.pc, Some(1))
+        else SafeRecursiveCalls(sctx.program, p.ws, p.pc, Some(25))
       }
       Union(
         GenericUDGrammar(sctx.program, Some(sctx.functionContext), inputs), //p.allAs map (_.toVariable))

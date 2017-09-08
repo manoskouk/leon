@@ -105,7 +105,7 @@ abstract class ProbDrivenEnumerationLike(name: String) extends Rule(name){
       case _ => Set()
     }(fd.fullBody).head
 
-    val program = { // FIXME: This breaks compatibility with class invariants
+    val program = { // FIXME: TERRIBLE HACK!!! Also breaks compatibility with class invariants
       val outerProgram = outerCtx.program
       Program {
         outerProgram.units.map { u =>
@@ -325,13 +325,23 @@ abstract class ProbDrivenEnumerationLike(name: String) extends Rule(name){
           debug(s"Passed testing!")
           validateCandidate(expr) foreach { sol =>
             val outerSol = sol.copy(term = innerToOuter(sol.term))
-            if (sol.isTrusted) return Stream(outerSol) // Found verifiable solution, return immediately
+            if (sol.isTrusted) {
+              // FIXME!!! TERRIBLE HACK
+              outerCtx.program.definedFunctions.foreach { f =>
+                f.fullBody = innerToOuter(f.fullBody)
+              }
+              return Stream(outerSol)
+            } // Found verifiable solution, return immediately
             else {
               // Solution was not verifiable, remember it anyway.
               untrusted :+= outerSol
             }
           }
         }
+      }
+      // FIXME!!! TERRIBLE HACK
+      outerCtx.program.definedFunctions.foreach { f =>
+        f.fullBody = innerToOuter(f.fullBody)
       }
 
       untrusted.toStream // Best we could do is find unverifiable solutions

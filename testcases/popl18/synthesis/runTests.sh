@@ -7,8 +7,8 @@ axioms1=on
 axioms2=off
 
 function run {
-    cmd="./leon --debug=report --timeout=60 --synthesis --userdefined --partial=off \
-         --mode=manual --manual:script=$1 $grammar2 --probwise:axioms=$axioms2 $2"
+    cmd="./leon --debug=report --timeout=60 --synthesis --partial=off \
+         --mode=manual --manual:script=$1 $2"
     echo "Running " $cmd
     echo "------------------------------------------------------------------------------------------------------------------"
     $cmd;

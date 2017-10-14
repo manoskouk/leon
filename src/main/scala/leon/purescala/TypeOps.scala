@@ -76,10 +76,13 @@ object TypeOps extends GenTreeOps[TypeTree] {
         // Glb of the variable will be the lub of its lower bounds
         val glb = greatestLowerBound(supers.map(_.bound))
 
-        if (subs.isEmpty) glb        // No lower bounds
-        else if (supers.isEmpty) lub // No upper bounds
-        else if (isSubtypeOf(glb, lub)) lub // Both lower and upper bounds. If they are compatible, randomly return lub
-        else unsolvable                     // Note: It is enough to use isSubtypeOf because lub and glb contain no type variables (of toInst)
+        val res =
+          if (subs.isEmpty) glb        // No lower bounds
+          else if (supers.isEmpty) lub // No upper bounds
+          else if (isSubtypeOf(glb, lub)) lub // Both lower and upper bounds. If they are compatible, randomly return lub
+          else unsolvable                     // Note: It is enough to use isSubtypeOf because lub and glb contain no type variables (of toInst)
+        if (res == Untyped) unsolvable
+        else res
       }.view.force
     }
 

@@ -85,12 +85,12 @@ abstract class ExpressionGrammar extends Printable {
     }
 
     val res = for(gp <- genericSeeds if gp.args.size < maxSize) yield {
-      println("Label: " + lab.asString)
-      println("GP: " + gp.label.asString + " ::= "+genProdAsString(gp))
+      //println("Label: " + lab.asString)
+      //println("GP: " + gp.label.asString + " ::= "+genProdAsString(gp))
       instantiation_<:(gp.label.tpe, tpe) match {
         case Some(tmap0) =>
-          println("YES")
-          println(tmap0)
+          //println("YES")
+          //println(tmap0)
           if (!compatibleLabel(gp)) { /*println("NOT COMP");*/ Nil } else {
           //println("COMP")
 
@@ -137,7 +137,7 @@ abstract class ExpressionGrammar extends Printable {
           }
 
         case _ =>
-          println("NO!")
+          //println("NO!")
           Seq()
       }
     }

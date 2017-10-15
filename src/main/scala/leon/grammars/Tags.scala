@@ -3,6 +3,7 @@
 package leon
 package grammars
 
+import leon.grammars.relational.RelTags
 import purescala.Types.CaseClassType
 import purescala.Definitions.FunDef
 
@@ -46,7 +47,7 @@ object Tags {
   val isConst: Set[Tag] = Set(Zero, One, Constant, BooleanC, Constructor(true))
 
   /** The set of tags that represent commutative operations */
-  val isCommut: Set[Tag] = Set(Plus, Times, Equals, Commut)
+  val isCommut: Set[Tag] = Set(Plus, Times, Equals, Commut, RelTags.Union, RelTags.Inters)
 
   /** The set of tags which have trivial results for equal arguments */
   val symmetricTrivial = Set(Minus, And, Or, Equals, Div, Mod)

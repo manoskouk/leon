@@ -448,8 +448,8 @@ object RelMain {
       val s = FreshIdentifier("s", S)
       val t = FreshIdentifier("t", T)
       val r = FreshIdentifier("r", TupleType(Seq(S, T)))
-      val p = FreshIdentifier("r", TupleType(Seq(T, T)))
-      val q = FreshIdentifier("r", TupleType(Seq(T, T)))
+      val p = FreshIdentifier("p", TupleType(Seq(T, T)))
+      val q = FreshIdentifier("q", TupleType(Seq(T, T)))
 
       val res1 = runProblem(Seq(s,t,r,p,q), 3, 7, false, Seq(S,T), Label(Untyped))
       val res2 = runProblem(Seq(s,t,r,p,q), 3, 7, true , Seq(S,T), Label(Untyped).withAspect(Tagged(Tags.Top, 0)))

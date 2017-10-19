@@ -116,18 +116,7 @@ object RelationalAlg {
     }
   }
 
-  trait RelType extends TypeTree with PrettyPrintable {
-
-    def printWith(implicit pctx: PrinterContext): Unit = {
-      val cn = this.getClass.getCanonicalName
-      val n = cn.substring(cn.lastIndexOf(".")).tail.init
-      p"$n"
-    }
-
-  }
-
-  object S extends RelType
-  object T extends RelType
+  trait RelType extends TypeTree with PrettyPrintable
 
 }
 
@@ -435,7 +424,7 @@ object RelMain {
   implicit val ctx = LeonContext.empty
 
   def runProblem(ids: Seq[Identifier], maxArity: Int, opNo: Int, opts: Boolean, baseTypes: Seq[TypeTree], rootLabel: Label) = {
-    val grammar = new RelationalGrammar(ids, maxArity, baseTypes)
+    val grammar = RelationalGrammar(ids, maxArity, baseTypes)
     val enumerator = new Enumerator(grammar, opts, rootLabel)
     val res = enumerator.uptoSize(opNo + 1)
     println(grammar.asString)
@@ -445,21 +434,33 @@ object RelMain {
   def main(args: Array[String]): Unit = {
 
     locally {
-      val s = FreshIdentifier("s", S)
-      val t = FreshIdentifier("t", T)
-      val r = FreshIdentifier("r", TupleType(Seq(S, T)))
-      val p = FreshIdentifier("p", TupleType(Seq(T, T)))
-      val q = FreshIdentifier("q", TupleType(Seq(T, T)))
+      object BinaryTree extends RelType {
+        def printWith(implicit pctx: PrinterContext): Unit = {
+          p"BinaryTree"
+        }
+      }
+      object Node extends RelType {
+        def printWith(implicit pctx: PrinterContext): Unit = {
+          p"Node"
+        }
+      }
 
-      val res1 = runProblem(Seq(s,t,r,p,q), 3, 7, false, Seq(S,T), Label(Untyped))
-      val res2 = runProblem(Seq(s,t,r,p,q), 3, 7, true , Seq(S,T), Label(Untyped).withAspect(Tagged(Tags.Top, 0)))
+      val bin = FreshIdentifier("Bin", BinaryTree)
+      val node = FreshIdentifier("Node", Node)
+
+      val root = FreshIdentifier("root", TupleType(Seq(BinaryTree, Node)))
+      val left = FreshIdentifier("left", TupleType(Seq(Node, Node)))
+      val right= FreshIdentifier("right", TupleType(Seq(Node, Node)))
+
+      val res1 = runProblem(Seq(bin, node, root, left,right), 3, 3, false, Seq(BinaryTree, Node), Label(Untyped))
+      //val res2 = runProblem(Seq(bin, node, root, left,right), 3, 3, true , Seq(BinaryTree, Node), Label(Untyped).withAspect(Tagged(Tags.Top, 0)))
 
       println("------ 1 ----------")
-      //res1 foreach println
+      res1 foreach println
       println("------ 2 ----------")
       //res2 foreach println
       println(s"Size 1: ${res1.size}")
-      println(s"Size 2: ${res2.size}")
+      //println(s"Size 2: ${res2.size}")
     }
 
   }

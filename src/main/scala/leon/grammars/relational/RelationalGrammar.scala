@@ -61,14 +61,15 @@ object RelationalAlg {
     }
   }
 
+import leon.purescala.Constructors.tupleTypeWrap
   case class Join(e1: Expr, e2: Expr) extends RelExpr {
     val getType = (e1.getType, e2.getType) match {
       case (TupleType(tps1), TupleType(tps2)) if tps1.last == tps2.head =>
-        TupleType(tps1.init ++ tps2.tail)
+        tupleTypeWrap(tps1.init ++ tps2.tail)
       case (TupleType(tps), other) if other == tps.last =>
-        TupleType(tps.init)
+        tupleTypeWrap(tps.init)
       case (other, TupleType(tps)) if other == tps.head =>
-        TupleType(tps.tail)
+        tupleTypeWrap(tps.tail)
       case (t1, t2) =>
         println(t1, t2)
         ???
@@ -175,12 +176,10 @@ case class RelationalGrammar(vars: Seq[Identifier], maxArity: Int, baseTypes: Se
 
     def join(l: Int) = {
       val input = tps.take(l)
-      val joinTp = tps(l)
-      for (x <- 0 to l) yield {
+      for (x <- 0 to l; joinTp <- baseTypes) yield {
         val first = flatten( (input take x) :+ joinTp)
         val last  = flatten( joinTp +: (input drop x))
-        val tps = (input take x) ++ Seq(joinTp) ++ (input drop x)
-        GenericProdSeed(tps.map(TypeParameterDef), Label(TupleType(input)), List(first, last), map => {
+        GenericProdSeed(input.map(TypeParameterDef), Label(flatten(input)), List(first, last), map => {
           val labels = List(first, last) map (tp => Label(instantiateType(tp, map)))
           ProductionRule(
             labels, { case Seq(e1, e2) => Join(e1, e2) }, RelTags.Join, 1, -1.0
@@ -206,7 +205,7 @@ case class RelationalGrammar(vars: Seq[Identifier], maxArity: Int, baseTypes: Se
 
     vars.map(vr) ++
     (2 to maxArity).flatMap(cross) ++
-    (2 to maxArity).flatMap(join) ++
+    (1 to maxArity).flatMap(join) ++
     List((Union, RelTags.Union), (Inters, RelTags.Inters), (Diff, RelTags.Diff)).map( (binary _).tupled ) ++
     List(RefTransClosure, TransClosure).map(unary(_, RelTags.Closure)) ++
     List(trans) ++
@@ -323,7 +322,7 @@ class Enumerator(grammar: ExpressionGrammar, optimizations: Boolean, rootLabel0:
     val cGen = new CGenerator()
 
     def rootLabel = {
-      rootLabel0.withAspect(Sized(termSize, optimizations)).withAspect(TypeDepthBound(2))
+      rootLabel0.withAspect(Sized(termSize, optimizations))//.withAspect(TypeDepthBound(2))
     }
 
     rootC = {
@@ -423,11 +422,11 @@ object RelMain {
 
   implicit val ctx = LeonContext.empty
 
-  def runProblem(ids: Seq[Identifier], maxArity: Int, opNo: Int, opts: Boolean, baseTypes: Seq[TypeTree], rootLabel: Label) = {
+  def runProblem(ids: Seq[Identifier], maxArity: Int, size: Int, opts: Boolean, baseTypes: Seq[TypeTree], rootLabel: Label) = {
     val grammar = RelationalGrammar(ids, maxArity, baseTypes)
     val enumerator = new Enumerator(grammar, opts, rootLabel)
-    val res = enumerator.uptoSize(opNo + 1)
-    println(grammar.asString)
+    val res = enumerator.uptoSize(size + 1)
+    //println(grammar.asString)
     res
   }
 
@@ -452,15 +451,15 @@ object RelMain {
       val left = FreshIdentifier("left", TupleType(Seq(Node, Node)))
       val right= FreshIdentifier("right", TupleType(Seq(Node, Node)))
 
-      val res1 = runProblem(Seq(bin, node, root, left,right), 3, 3, false, Seq(BinaryTree, Node), Label(Untyped))
-      //val res2 = runProblem(Seq(bin, node, root, left,right), 3, 3, true , Seq(BinaryTree, Node), Label(Untyped).withAspect(Tagged(Tags.Top, 0)))
+      val res1 = runProblem(Seq(bin, node, root, left,right), 3, 4, false, Seq(BinaryTree, Node), Label(Untyped))
+      val res2 = runProblem(Seq(bin, node, root, left,right), 3, 4, true , Seq(BinaryTree, Node), Label(Untyped).withAspect(Tagged(Tags.Top, 0)))
 
       println("------ 1 ----------")
-      res1 foreach println
+      //res1 foreach println
       println("------ 2 ----------")
       //res2 foreach println
       println(s"Size 1: ${res1.size}")
-      //println(s"Size 2: ${res2.size}")
+      println(s"Size 2: ${res2.size}")
     }
 
   }

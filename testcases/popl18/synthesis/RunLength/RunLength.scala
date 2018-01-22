@@ -49,4 +49,35 @@ object RunLength {
       legal(res) && decode(res) == l
   }
 
+  def encode2[A](l: List[A]): List[(BigInt, A)] = {
+    // Solution
+    /*l match {
+      case Nil() => Nil[(BigInt, A)]()
+      case Cons(x, xs) =>
+        val rec = encode(xs)
+        rec match {
+          case Nil() =>
+            Cons( (BigInt(1), x), Nil[(BigInt,A)]())
+          case Cons( (recC, recEl), recTl) =>
+            if (x == recEl) {
+              Cons( (1+recC, x), recTl)
+            } else {
+              Cons( (BigInt(1), x), rec )
+            }
+        }
+    }*/
+    ???[List[(BigInt, A)]]
+  } ensuring {
+    (res: List[(BigInt, A)]) =>
+      (l, res) passes {
+        case Nil() => Nil()
+        case Cons(a, Nil()) => Cons((1,a), Nil())
+        case Cons(a, Cons(b, Nil())) if a == b =>
+          Cons((2, a), Nil())
+        case Cons(a, Cons(b, Nil())) if a != b =>
+          Cons((1, a), Cons((1,b), Nil()))
+      }
+  }
+
+
 }

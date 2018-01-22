@@ -141,7 +141,7 @@ class SimilarToSuite extends LeonTestSuiteWithProgram with ExpressionsDSL {
       val g = OneOf(vs)
       val label = Label(exp.getType).withAspect(SimilarTo(Seq(from), fd))
       val scorer = new CandidateScorer[Label, Expr]( (_, _) => MeetsSpec.YES, _ => Seq())(fix._1)
-      val enum = new ProbwiseTopdownEnumerator(g, label, scorer, Seq(), (_, _) => null, -1000000, 100000, false)(fix._1)
+      val enum = new ProbwiseTopdownEnumerator(g, label, scorer, Seq(), (_, _) => null, -1000000, 100000, 5, false)(fix._1)
       val exprs = enum.iterator(label)
 
       //println(s"SimilarTo(${from.asString}):")

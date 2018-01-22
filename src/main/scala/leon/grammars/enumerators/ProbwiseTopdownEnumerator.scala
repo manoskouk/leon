@@ -245,6 +245,7 @@ abstract class AbstractProbwiseTopdownEnumerator[NT, R](scorer: CandidateScorer[
       if (indistinguish && currentMaxGenerated == maxEnumerated) {
         currentMaxGenerated = Math.min(maxEnumerated, (untrustedScoreRatio * generated).toInt)
       }
+      println(s"## $generated ${res.priority} ")
       res.get
     }
 

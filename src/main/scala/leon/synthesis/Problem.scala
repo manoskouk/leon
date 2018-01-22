@@ -71,7 +71,7 @@ case class Problem(as: List[Identifier], ws: Expr, pc: Path, phi: Expr, xs: List
     copy(ws = andJoin(wsList ++ es))
   }
 
-  def qebFiltered(implicit hctx: SynthesisContext) = qeb.evalAndDiscardIns.filterIns(pc.fullClause)
+  def qebFiltered(implicit hctx: SynthesisContext) = qeb.evalAndDiscardIns.filterIns(simplifyLets(pc.fullClause))
 
   // Qualified example bank, allows us to perform operations (e.g. filter) with expressions
   def qeb(implicit sctx: SynthesisContext) = QualifiedExamplesBank(this.as, this.xs, eb)

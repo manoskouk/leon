@@ -35,16 +35,21 @@ abstract class ProbDrivenEnumerationLike(name: String) extends Rule(name){
 
     val solverTo = 5000
 
+    val isByExample = outerP.phi.isInstanceOf[Passes]
+
     val outerExamples = {
       // Get from the params of the outer program if we are applying ind. heuristic
       val Params(_, _, indistinguish) = getParams(outerCtx, outerP)
       // If we do, we have to limit # of examples for performance
-      val howMany = if (indistinguish) 3 else 5000
+      val howMany = if (indistinguish) 3 else 50
       val fromProblem = outerP.qebFiltered(outerCtx).eb.examples
       val (in, inOut) = fromProblem.partition(_.isInstanceOf[InExample])
+      //println(fromProblem)
       // We are forced to take all in-out examples
-      if (inOut.nonEmpty) inOut ++ in.take(howMany - inOut.size)
-      else if (in.nonEmpty) in.take(howMany)
+      if (inOut.nonEmpty) {
+        if (isByExample) inOut
+        else inOut ++ in.take(howMany - inOut.size)
+      } else if (in.nonEmpty) in.take(howMany)
       else {
         // If we have none, generate one with the solver
         val solverF = SolverFactory.getFromSettings(outerCtx, outerCtx.program).withTimeout(solverTo)
@@ -154,10 +159,10 @@ abstract class ProbDrivenEnumerationLike(name: String) extends Rule(name){
     // Limit prob. programs
     val (minLogProb, maxEnumerated) = {
       import SynthesisPhase._
-      if (sctx.findOptionOrDefault(optMode) == Modes.Probwise)
+      if (sctx.findOptionOrDefault(optMode) == Modes.ProbwiseOnly)
         (-1000000000.0, 100000000) // Run forever in probwise-only mode
       else
-        (-100.0, 50000)
+        (-50.0, 1000)
     }
 
     // How much deeper to seek when found an untrusted solution

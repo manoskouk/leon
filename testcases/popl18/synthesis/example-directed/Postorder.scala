@@ -7,15 +7,15 @@ import leon.collection._
 
 object Postorder {
   abstract class Tree[A]
-  case class List[A]() extends Tree[A]
+  case class Leaf[A]() extends Tree[A]
   case class Node[A](l: Tree[A], v: A, r: Tree[A]) extends Tree[A]
 
-  def ruleAppend[A](l1: List[A], l2: List[A]) = l1 ++ l2
+  @production(10) def ruleAppend[A](l1: List[A], l2: List[A]) = l1 ++ l2
 
   def postorder[A](t: Tree[A]): List[A] = {
     ???[List[A]]
-  } extends { res =>
-    (t, res) extends {
+  } ensuring { res =>
+    (t, res) passes {
       case Leaf() => Nil()
       case Node(Leaf(), a, Leaf()) => Cons(a, Nil())
       case Node(Node(Leaf(), a, Leaf()), b, Leaf()) => Cons(a, Cons(b, Nil()))

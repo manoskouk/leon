@@ -73,8 +73,8 @@ abstract class ProbDrivenEnumerationLike(name: String) extends Rule(name){
       }
     }
 
-    println("Final examples:")
-    println(outerExamples)
+    //println("Final examples:")
+    //println(outerExamples)
 
 
     // Create a fresh solution function with the best solution around the

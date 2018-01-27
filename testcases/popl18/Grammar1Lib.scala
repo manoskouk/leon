@@ -11,7 +11,7 @@ import leon.lang.synthesis._
 import leon.math._
 import annotation.grammar._
 
-object grammar {
+object Grammar {
   @production(1787)
   @tag("and")
   def pBooleanAnd(v0 : Boolean, v1 : Boolean): Boolean = v0 && v1

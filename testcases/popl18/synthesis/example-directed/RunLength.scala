@@ -30,15 +30,16 @@ object RunLength {
     (res: List[(BigInt, A)]) =>
       (l, res) passes {
         case Nil() => Nil()
-        case Cons(a, Nil()) => Cons((1,a), Nil())
+        case Cons(a, Nil()) =>
+          List((1,a))
         case Cons(a, Cons(b, Nil())) if a == b =>
-          List((2, a))
+          List((2,a))
         case Cons(a, Cons(b, Cons(c, Nil()))) if a == b && a == c =>
-          List((3, a))
+          List((3,a))
         case Cons(a, Cons(b, Cons(c, Nil()))) if a != b && b == c =>
-          List((1, a), (2, b))
+          List((1,a), (2,b))
         case Cons(a, Cons(b, Nil())) if a != b =>
-          List((1, a), (1, b))
+          List((1,a), (1,b))
       }
   }
 

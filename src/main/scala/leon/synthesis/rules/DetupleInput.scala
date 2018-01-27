@@ -119,7 +119,7 @@ case object DetupleInput extends NormalizingRule("Detuple In") {
               List(v)
           }
         })
-      }
+      }.eb
 
       val newAs = p.as.flatMap(subAs)
 

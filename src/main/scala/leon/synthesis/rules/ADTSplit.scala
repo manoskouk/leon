@@ -100,7 +100,7 @@ case object ADTSplit extends Rule("ADT Split.") {
                   case _ =>
                     Nil
                 }
-              }
+              }.eb
             } else {
               p.eb
             }

@@ -80,10 +80,15 @@ case object InequalitySplit extends Rule("Ineq. Split.") {
           }
 
           def compValues(map: Map[Identifier, Expr], eq: Boolean) = {
+            println(map)
             for {
               v1 <- map.get(f)
               v2 <- { t match { case Variable(id) => map.get(id) case _ => Some(t) } }
-            } yield (v1 == v2) == eq
+            } yield {
+              val res = (v1 == v2) == eq
+              println(s"###$f -> $t i.e. $v1 -> $v2 yields $res")
+              res
+            }
           }.getOrElse(true)
 
           val newP = if (isInput) {
@@ -92,7 +97,7 @@ case object InequalitySplit extends Rule("Ineq. Split.") {
               pc = p.pc map (subst(f -> t, _)),
               ws = subst(f -> t, p.ws),
               phi = subst(f -> t, p.phi),
-              eb = p.qeb.filterIns(m => compValues(m, true))
+              eb = p.qeb.filterIns(m => compValues(m, true)).removeIns(Set(f))
             )
           } else {
             p.copy(pc = p.pc withCond pc).withWs(Seq(Inactive(f))) // equality in pc is fine for numeric types

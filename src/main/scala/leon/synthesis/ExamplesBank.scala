@@ -193,7 +193,7 @@ case class QualifiedExamplesBank(as: List[Identifier], xs: List[Identifier], eb:
       case _: NoSuchElementException =>
         Nil
     }
-  })
+  }.eb)
 
   /** Filter inputs through expr which is an expression evaluating to a boolean */
   def filterIns(expr: Expr): QualifiedExamplesBank = {
@@ -217,14 +217,14 @@ case class QualifiedExamplesBank(as: List[Identifier], xs: List[Identifier], eb:
   /** Maps inputs through the function f
     *
     * @return A new ExampleBank */
-  def flatMapIns(f: Seq[(Identifier, Expr)] => List[Seq[Expr]]): ExamplesBank = {
-    eb flatMap {
+  def flatMapIns(f: Seq[(Identifier, Expr)] => List[Seq[Expr]]): QualifiedExamplesBank = {
+    copy(eb = eb flatMap {
       case InExample(in) =>
         f(as zip in).map(InExample)
 
       case InOutExample(in, out) =>
         f(as zip in).map(InOutExample(_, out))
-    }
+    })
   }
 
   def asConstraint: Expr = {

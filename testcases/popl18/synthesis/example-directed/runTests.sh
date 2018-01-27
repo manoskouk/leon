@@ -2,7 +2,7 @@
 
 manualarg=${1:?"Error: expected manual 'm' or 'a'"}
 grammararg=${2:?"Error: expected grammar 0 1 or 2"}
-print=${3:-" "}
+print=${3:-"no"}
 
 if [ "$grammararg" == 1 ]
 then

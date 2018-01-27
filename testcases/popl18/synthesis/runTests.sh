@@ -3,7 +3,7 @@
 modearg=${1:?"Error: expected algorithm 'ste' or 'prob'"}
 manualarg=${2:?"Error: expected manual 'm' or 'a'"}
 grammararg=${3:?"Error: expected grammar 0 1 or 2"}
-print=${4:-" "}
+print=${4:-"no"}
 
 if [ "$grammararg" == 1 ]
 then

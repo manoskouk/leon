@@ -5,15 +5,22 @@ import leon.lang._
 import leon.lang.synthesis._
 import leon.collection._
 
-object Postorder {
+object NodesAtLevel {
   abstract class Tree[A]
   case class Leaf[A]() extends Tree[A]
   case class Node[A](l: Tree[A], v: A, r: Tree[A]) extends Tree[A]
 
-  def postorder[A](t: Tree[A], l: BigInt): BigInt = {
+  def nodesAtLevel[A](t: Tree[A], l: BigInt): BigInt = {
+    require(l >= 0)
+    /*(t, l) match {
+      case (Leaf(), _) => BigInt(0)
+      case (_, BigInt(0)) => BigInt(1)
+      case (Node(l, _, r), n) => nodesAtLevel(l, n - 1) + nodesAtLevel(r, n - 1)
+    }*/
     ???[BigInt]
   } ensuring { (res: BigInt) =>
     ((t, l), res) passes {
+      //case (_, n) if n < 0 => 0
       case (Leaf(), _) => 0
       case (Node(Leaf(), _, Leaf()), BigInt(0)) => 1
       case (Node(Leaf(), _, Leaf()), BigInt(1)) => 0

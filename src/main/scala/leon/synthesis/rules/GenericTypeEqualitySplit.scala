@@ -44,19 +44,33 @@ case object GenericTypeEqualitySplit extends Rule("Eq. Split") {
         val v2 = Variable(a2)
 
         val (f, t, isInput) = if (p.as contains a1) (a1, v2, true) else (a2, v1, p.as contains a2)
+
+        def compValues(map: Map[Identifier, Expr], eq: Boolean) = {
+          for {
+            v1 <- map.get(f)
+            v2 <- map.get(t.id)
+          } yield (v1 == v2) == eq
+        }.getOrElse(true)
+
         val eq = if (isInput) {
           p.copy(
             as = p.as.diff(Seq(f)),
             pc = p.pc map (subst(f -> t, _)),
             ws = subst(f -> t, p.ws),
             phi = subst(f -> t, p.phi),
-            eb = p.qeb.removeIns(Set(f))
+            eb = p.qeb.filterIns(compValues(_, true)).removeIns(Set(f))
           )
         } else {
-          p.copy(pc = p.pc withCond Equals(v1,v2)).withWs(Seq(Inactive(f))) // FIXME!
+          p.copy(
+            pc = p.pc withCond Equals(v1,v2),
+            eb = p.qeb.filterIns(compValues(_, true))
+          ).withWs(Seq(Inactive(f))) // FIXME!
         }
 
-        val neq = p.copy(pc = p.pc withCond not(Equals(v1, v2)))
+        val neq = p.copy(
+          pc = p.pc withCond not(Equals(v1, v2)),
+          eb = p.qeb.filterIns(compValues(_, false))
+        )
 
         val subProblems = List(eq, neq)
 

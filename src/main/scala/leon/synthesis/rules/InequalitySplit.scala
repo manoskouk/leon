@@ -4,6 +4,7 @@ package leon
 package synthesis
 package rules
 
+import leon.purescala.Common.Identifier
 import leon.synthesis.Witnesses.Inactive
 import purescala.Expressions._
 import purescala.Types._
@@ -48,7 +49,7 @@ case object InequalitySplit extends Rule("Ineq. Split.") {
       (fromPhi.toSet ++ p.pc.conditions ++ p.pc.bindings.map { case (id,e) => Equals(id.toVariable, e) }) flatMap getFacts
     }
 
-    val candidates =
+    val candidates: List[List[Expr]] =
       (p.allAs.map(_.toVariable).filter(_.getType == Int32Type) :+ IntLiteral(0)).combinations(2).toList ++
       (p.allAs.map(_.toVariable).filter(_.getType == IntegerType) :+ InfiniteIntegerLiteral(0)).combinations(2).toList
 
@@ -65,7 +66,11 @@ case object InequalitySplit extends Rule("Ineq. Split.") {
           Some(pc, p.copy(pc = p.pc withCond pc))
         } else None
 
+
+
         val eq: Option[(Equals, Problem)] = if (!facts.contains(EQ(v1, v2)) && !facts.contains(EQ(v2,v1))) {
+
+
           val pc = Equals(v1, v2)
           // Let's see if an input variable is involved
           val (f, t, isInput) = (v1, v2) match {
@@ -74,13 +79,20 @@ case object InequalitySplit extends Rule("Ineq. Split.") {
             case (Variable(a1), _)                      => (a1, v2, false)
           }
 
+          def compValues(map: Map[Identifier, Expr], eq: Boolean) = {
+            for {
+              v1 <- map.get(f)
+              v2 <- { t match { case Variable(id) => map.get(id) case _ => Some(t) } }
+            } yield (v1 == v2) == eq
+          }.getOrElse(true)
+
           val newP = if (isInput) {
             p.copy(
               as = p.as.diff(Seq(f)),
               pc = p.pc map (subst(f -> t, _)),
               ws = subst(f -> t, p.ws),
               phi = subst(f -> t, p.phi),
-              eb = p.qeb.filterIns(m => m(f) == t)
+              eb = p.qeb.filterIns(m => compValues(m, true))
             )
           } else {
             p.copy(pc = p.pc withCond pc).withWs(Seq(Inactive(f))) // equality in pc is fine for numeric types

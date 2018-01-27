@@ -237,7 +237,7 @@ class TableEvaluator(ctx: LeonContext, prog: Program, bank: EvaluationBank = new
           e(tfd.precondition.get)(frame, gctx) match {
             case BooleanLiteral(true) =>
             case BooleanLiteral(false) =>
-              throw RuntimeError("Precondition violation for '" + tfd.id.asString + "' reached in evaluation.: " + tfd.precondition.get.asString)
+              throw RuntimeError("Precondition violation for '" + ex.asString + "' reached in evaluation.: " + tfd.precondition.get.asString)
             case other =>
               throw RuntimeError(typeErrorMsg(other, BooleanType))
           }

@@ -26,6 +26,7 @@ object Calc {
       case Minus(Const(BigInt(-10)), Const(BigInt(7))) => -17
       case Times(Const(BigInt(-10)), Const(BigInt(7))) => -70
       case Max(Const(BigInt(-8)), Const(BigInt(5))) => 5
+      case Max(Const(BigInt(10)), Const(BigInt(20))) => 20
     }
   }
 

@@ -32,7 +32,7 @@ fi
 
 
 function run {
-    cmd="./leon --debug=report --timeout=60 --synthesis $userdefined --partial=off \
+    cmd="./leon --debug=report --synthesis $userdefined --partial=off \
                 --mode=$mode --manual:script=$1 $grammar --probwise:axioms=$axioms $2"
     if [ $print == "print" ] 
     then
@@ -53,11 +53,11 @@ echo "==========================================================================
 
 dir=testcases/popl18/synthesis/example-directed
 
-run 0 $dir/Add.scala
-run 0 $dir/Append.scala
-run 0 $dir/BInsert.scala
-run 0 $dir/Calc.scala
-run 0 $dir/Compress.scala
+#run 3,0,2,1,0,0,2 $dir/Add.scala
+#run 3,0,2,1,0,0,2 $dir/Append.scala
+#run 4,0,2,1,0,0,3,0,2,1,2,2,2 $dir/BInsert.scala
+#run 3,0,2,1,0,0,2 $dir/Calc.scala
+run 3,0,0,1,0,0,2 $dir/Compress.scala
 run 0 $dir/CountLeaves.scala
 run 0 $dir/Dequeue.scala
 run 0 $dir/DictContains.scala

@@ -228,7 +228,7 @@ case object Focus extends PreprocessingRule("Focus") {
                 val insWithout = ins.collect{ case (id, v) if !substAs.contains(id) => v }
                 eval.result.map(r => insWithout ++ unwrapTuple(r, vars.size)).toList
               }
-              val newEb = eb2.flatMapIns(ebF)
+              val newEb = eb2.flatMapIns(ebF).eb
               timers.Match.filterIns.stop()
               Some(Problem(newAs, newWs, newPc, newPhi, p.xs, newEb))
             } else {

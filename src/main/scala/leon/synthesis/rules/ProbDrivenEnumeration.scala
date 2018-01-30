@@ -35,6 +35,28 @@ abstract class ProbDrivenEnumerationLike(name: String) extends Rule(name){
 
     val solverTo = 5000
 
+    val solverExample = {
+      // If we have none, generate one with the solver
+      val solverF = SolverFactory.getFromSettings(outerCtx, outerCtx.program).withTimeout(solverTo)
+      val solver  = solverF.getNewSolver()
+      try {
+        solver.assertCnstr(outerP.pc.toClause)
+        solver.check match {
+          case Some(true) =>
+            val model = solver.getModel
+            InExample(outerP.as map (id => model.getOrElse(id, simplestValue(id.getType))))
+          case None =>
+            warning("Could not solve path condition")
+            InExample(outerP.as.map(_.getType) map simplestValue)
+          case Some(false) =>
+            warning("PC is not satisfiable.")
+            throw UnsatPCException
+        }
+      } finally {
+        solverF.reclaim(solver)
+      }
+    }
+
     val isByExample = outerP.phi.isInstanceOf[Passes]
 
     val outerExamples = {
@@ -51,31 +73,12 @@ abstract class ProbDrivenEnumerationLike(name: String) extends Rule(name){
         else inOut ++ in.take(howMany - inOut.size)
       } else if (in.nonEmpty) in.take(howMany)
       else {
-        // If we have none, generate one with the solver
-        val solverF = SolverFactory.getFromSettings(outerCtx, outerCtx.program).withTimeout(solverTo)
-        val solver  = solverF.getNewSolver()
-        try {
-          solver.assertCnstr(outerP.pc.toClause)
-          solver.check match {
-            case Some(true) =>
-              val model = solver.getModel
-              Seq(InExample(outerP.as map (id => model.getOrElse(id, simplestValue(id.getType)))))
-            case None =>
-              warning("Could not solve path condition")
-              Seq(InExample(outerP.as.map(_.getType) map simplestValue))
-            case Some(false) =>
-              warning("PC is not satisfiable.")
-              throw UnsatPCException
-          }
-        } finally {
-          solverF.reclaim(solver)
-        }
+        Seq(solverExample)
       }
     }
 
     //println("Final examples:")
     //println(outerExamples)
-
 
     // Create a fresh solution function with the best solution around the
     // current STE as body
@@ -162,20 +165,20 @@ abstract class ProbDrivenEnumerationLike(name: String) extends Rule(name){
     // Limit prob. programs
     val (minLogProb, maxEnumerated) = {
       import SynthesisPhase._
-      if (sctx.findOptionOrDefault(optMode) == Modes.ProbwiseOnly)
-        (-1000000000.0, 100000000) // Run forever in probwise-only mode
+      if (Set(Modes.Probwise, Modes.Default) contains sctx.findOptionOrDefault(optMode))
+        (-41.0, 4000)
       else
-        (-50.0, 1000)
+        (-1000000000.0, 100000000) // Run forever in probwise-only/manual mode
     }
 
     // How much deeper to seek when found an untrusted solution
-    val untrustedCostRatio = 5
+    val untrustedCostRatio = if (isByExample) 100 else 5
 
     val fullEvaluator = new TableEvaluator(sctx, program)
     val partialEvaluator = new PartialExpansionEvaluator(sctx, program)
     val solverF = SolverFactory.getFromSettings(sctx, program).withTimeout(solverTo)
     val Params(topLabel, grammar, indistinguish) = getParams(sctx, p)
-    debug("Examples:\n" + examples.map(_.asString).mkString("\n"))
+    debug("Examples before filtering:\n" + examples.map(_.asString).mkString("\n"))
 
     // Evaluates a candidate against an example in the correct environment
     def evalCandidate(expr: Expr, evalr: Evaluator)(ex: Example): evalr.EvaluationResult = timers.eval.timed {
@@ -302,6 +305,7 @@ abstract class ProbDrivenEnumerationLike(name: String) extends Rule(name){
           case Some(false) =>
             debug("Proven correct!")
             timers.cegisIter.stop()
+            //println(s"### ${maxEnumerated - remaining + enum.generated}")
             Some(Solution(BooleanLiteral(true), Set(), expr, isTrusted = true))
 
           case None =>
@@ -321,6 +325,11 @@ abstract class ProbDrivenEnumerationLike(name: String) extends Rule(name){
     }
 
     def solutionStream: Stream[Solution] = {
+      if (isByExample && !outerExamples.exists(_.isInstanceOf[InOutExample])) {
+        // No examples, return anything
+        debug("By example problem with no examples, return simplest value")
+        return Stream(Solution(BooleanLiteral(true), Set(), simplestValue(outerP.outType), isTrusted = true))
+      }
       timers.cegisIter.start()
       var untrusted: Seq[Solution] = Seq()
       while (!sctx.interruptManager.isInterrupted && it.hasNext) {

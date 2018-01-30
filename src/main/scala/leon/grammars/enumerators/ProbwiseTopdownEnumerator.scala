@@ -52,7 +52,7 @@ class ProbwiseTopdownEnumerator(protected val grammar: ExpressionGrammar,
 
   debug(s"Creating ProbwiseTopdownEnumerator with indistinguish = $indistinguish")
   debug("Available examples:")
-  examples foreach (ex => debug("  -" + ex))
+  examples foreach (ex => debug("  -" + ex.asString))
 
   val hors = timers.horMap.timed{ GrammarEnumerator.horizonMap(init, productions).map{ case (k,v) => k -> v._2 } }
   protected def productions(nt: Label) = grammar.getProductions(nt)
@@ -245,7 +245,7 @@ abstract class AbstractProbwiseTopdownEnumerator[NT, R](scorer: CandidateScorer[
       if (indistinguish && currentMaxGenerated == maxEnumerated) {
         currentMaxGenerated = Math.min(maxEnumerated, (untrustedScoreRatio * generated).toInt)
       }
-      println(s"## $generated ${res.priority} ")
+      //println(s"## $generated ${res.priority} ")
       res.get
     }
 
@@ -323,6 +323,7 @@ abstract class AbstractProbwiseTopdownEnumerator[NT, R](scorer: CandidateScorer[
             // The element has failed partial evaluation ...
             ifVerboseDebug { printer =>
               val scoreTriple = (score.yesExs.size, score.noExs.size, score.maybeExs.size)
+              printer(s"Failing example: ${score.noExs.head}")
               printer(s"Element rejected. compliesTests = $compliesTests, scoreTriple = $scoreTriple.")
             }
           }
